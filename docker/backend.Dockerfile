@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY backend /app/backend
+COPY agent /app/agent
+COPY database /app/database
+RUN useradd --create-home --uid 10001 missioncontrol
+USER missioncontrol
+EXPOSE 8000
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

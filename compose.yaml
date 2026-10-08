@@ -1,0 +1,59 @@
+name: missioncontrol-ai
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: missioncontrol
+      POSTGRES_USER: mc_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python scripts/configure.py first}
+      READER_PASSWORD: ${READER_PASSWORD:?Run configuration first}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Run configuration first}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./docker/init-roles.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mc_admin -d missioncontrol"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  seed:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    command: ["python", "-m", "database.bootstrap"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://mc_admin:${POSTGRES_PASSWORD}@db:5432/missioncontrol
+    depends_on:
+      db: {condition: service_healthy}
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://mc_app:${APP_DB_PASSWORD}@db:5432/missioncontrol
+      READ_DATABASE_URL: postgresql+psycopg://mc_reader:${READER_PASSWORD}@db:5432/missioncontrol
+      APP_TOKEN: ${APP_TOKEN:?Run configuration first}
+      REVIEW_TOKEN: ${REVIEW_TOKEN:?Run configuration first}
+      AGENT_MODE: ${AGENT_MODE:-demo}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+    depends_on:
+      seed: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health-check')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports: ["127.0.0.1:8080:80"]
+    depends_on:
+      backend: {condition: service_healthy}
+    restart: unless-stopped
+volumes:
+  db_data:
