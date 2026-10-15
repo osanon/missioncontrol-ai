@@ -1,0 +1,11 @@
+# Optional development UI. Docker Compose loads this alongside compose.yaml.
+# Start explicitly with: bash scripts/adminer-start.sh
+services:
+  adminer:
+    image: adminer:6.1.1
+    profiles: [database-tools]
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - "127.0.0.1:8081:8080"
+    restart: "no"

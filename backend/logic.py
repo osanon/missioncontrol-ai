@@ -1,8 +1,10 @@
 import uuid
+import math
 from decimal import Decimal
 from datetime import date, datetime, timezone
 from sqlalchemy import text, select, update
 from sqlalchemy.exc import IntegrityError
+from backend.mutations import serialize_writes
 from backend.db import engine, reader, DATA_TABLES, proposals, audit
 
 def now(): return datetime.now(timezone.utc).isoformat()
@@ -50,7 +52,7 @@ def cohorts(start='2026-07-01',end='2026-09-30'):
     return {'rows':rows,'sql':COHORT_SQL,'period':period(start,end),'definition':'Positive employment services in the period; housing cohort also has positive housing services in the same period. Outcome: at least one job starting in the period. Counts distinct clients. Association does not establish causation or service-before-job timing.'}
 
 CHECKS=[
- ('duplicate','clients',"SELECT b.id FROM clients a JOIN clients b ON a.full_name=b.full_name AND a.birth_date=b.birth_date AND a.id<b.id",'Possible duplicate identity','Names and birth dates match another record. Review source documents; no automatic merge.','medium'),
+ ('duplicate','clients',"SELECT DISTINCT b.id FROM clients a JOIN clients b ON a.full_name=b.full_name AND a.birth_date=b.birth_date AND a.id<b.id WHERE NOT EXISTS (SELECT 1 FROM client_merges m WHERE m.source_id=a.id OR m.source_id=b.id)",'Possible duplicate identity','Names and birth dates match another record. Compare both profiles and confirm identity before proposing a merge.','medium'),
  ('invalid_dates','enrollments','SELECT id FROM enrollments WHERE end_date < start_date','Exit precedes entry','Verify the dates against source records.','high'),
  ('missing_exit','enrollments',"SELECT id FROM enrollments WHERE status='exited' AND end_date IS NULL",'Missing exit date','An exited enrollment has no exit date. Confirm with the program.','medium'),
  ('wage_outlier','employment','SELECT id FROM employment WHERE hourly_wage < 1 OR hourly_wage > 200','Implausible hourly wage','Outside the demo $1–$200 plausibility range. A reviewer can clear the unverified wage and flag it.','high'),
@@ -60,50 +62,180 @@ CHECKS=[
 def issues():
     out=[]
     with engine.connect() as c:
-        statuses={x.issue_key:x.status for x in c.execute(select(proposals)).mappings()}
+        statuses={x.issue_key.split('@',1)[0]:x.status for x in c.execute(select(proposals).order_by(proposals.c.created_at, proposals.c.id)).mappings() if '@' not in x.issue_key}
     for kind,table,sql,title,reason,severity in CHECKS:
         for x in query(sql):
             key=f'{kind}:{x["id"]}'
             record=query(f'SELECT * FROM {table} WHERE id=:id',{'id':x['id']})[0]
-            out.append(dict(key=key,kind=kind,table=table,record_id=x['id'],title=title,reason=reason,severity=severity,record=record,review_required=bool(record['review_required']),proposal_status=statuses.get(key),source_sql=sql))
+            out.append(dict(key=key,kind=kind,table=table,record_id=x['id'],title=title,reason=reason,severity=severity,record=record,review_required=bool(record['review_required']),proposal_status=statuses.get(key),source_sql=sql,context=record_context(table,record)))
     return out
 
 class Conflict(ValueError): pass
 
-def propose(issue_key, actor='analyst'):
-    # The model supplies only an issue key. Targets and patch are created by trusted code.
+
+def record_context(table, record):
+    client_id = record.get('id') if table == 'clients' else record.get('client_id')
+    client = query('SELECT external_id, full_name FROM clients WHERE id=:id', {'id': client_id}) if client_id else []
+    program = query('SELECT name FROM programs WHERE id=:id', {'id': record.get('program_id')}) if record.get('program_id') else []
+    return {'client_id': client_id, 'client_name': client[0]['full_name'] if client else None,
+            'client_identifier': client[0]['external_id'] if client else None,
+            'program': program[0]['name'] if program else None}
+
+
+def proposal_view(item):
+    result = dict(item)
+    t = DATA_TABLES[result['table_name']]
     with engine.connect() as c:
-        existing=c.execute(select(proposals).where(proposals.c.issue_key==issue_key)).mappings().first()
-        if existing:return dict(existing)
-    issue=next((x for x in issues() if x['key']==issue_key),None)
-    if not issue:raise ValueError('Issue does not exist or no longer applies.')
-    before={'review_required':bool(issue['record']['review_required'])}
-    after={'review_required':True}
-    if issue['kind']=='wage_outlier':
-        before['hourly_wage']=issue['record']['hourly_wage'];after['hourly_wage']=None
-    item=dict(id=str(uuid.uuid4()),issue_key=issue_key,table_name=issue['table'],record_id=issue['record_id'],before=before,after=after,reason=issue['reason'],status='pending',created_at=now(),decided_at=None,decided_by=None)
+        current = c.execute(select(t).where(t.c.id == result['record_id'])).mappings().first()
+    record = dict(current) if current else {}
+    result['current_record'] = record
+    result['context'] = record_context(result['table_name'], record)
+    result['snapshot_complete'] = 'id' in result['before']
+    result['proposal_type'] = 'merge' if result['after'].get('action') == 'merge_clients' else 'follow_up' if set(result['after']) == {'review_required'} else 'correction'
+    result['base_issue_key'] = result['issue_key'].split('@', 1)[0]
+    return result
+
+
+def list_proposals():
+    with engine.connect() as c:
+        rows = list(c.execute(select(proposals).order_by(proposals.c.created_at.desc())).mappings())
+    return [proposal_view(row) for row in rows]
+
+
+def correction_patch(issue, resolution, value, evidence):
+    record = issue['record']
+    allowed = {
+        'missing_exit': {'follow_up', 'set_exit_date', 'reactivate_enrollment'},
+        'invalid_dates': {'follow_up', 'set_exit_date'},
+        'wage_outlier': {'follow_up', 'correct_wage', 'clear_wage'},
+        'negative_units': {'follow_up', 'correct_units'},
+        'duplicate': {'follow_up'},
+    }
+    if resolution not in allowed.get(issue['kind'], set()):
+        raise ValueError('This resolution is not available for this finding.')
+    if resolution not in ('follow_up', 'clear_wage') and len(evidence.strip()) < 10:
+        raise ValueError('Describe the source or confirmation supporting this correction (at least 10 characters).')
+    if resolution in ('follow_up', 'reactivate_enrollment', 'clear_wage') and value:
+        raise ValueError('This resolution does not accept a value.')
+    if resolution == 'follow_up':
+        if record['review_required']:
+            raise ValueError('This record is already flagged for follow-up. Choose a confirmed correction when available.')
+        return {'review_required': True}, 'Flag for follow-up; the underlying data issue remains unresolved.'
+    if resolution == 'reactivate_enrollment':
+        return {'status': 'active', 'end_date': None}, 'Reactivate this program enrollment after confirmation.'
+    if resolution == 'set_exit_date':
+        try:
+            exit_date = date.fromisoformat(value)
+            start_date = date.fromisoformat(record['start_date'])
+        except (ValueError, TypeError):
+            raise ValueError('Enter a valid exit date; the enrollment start date must also be valid.')
+        if exit_date.isoformat() != value:
+            raise ValueError('Use YYYY-MM-DD for the exit date.')
+        if exit_date < start_date:
+            raise ValueError('The exit date cannot be before the enrollment start date.')
+        if exit_date > datetime.now(timezone.utc).date():
+            raise ValueError('A confirmed exit date cannot be in the future.')
+        return {'end_date': value, 'status': 'exited'}, 'Record the confirmed exit date for this enrollment.'
+    if resolution == 'clear_wage':
+        return {'hourly_wage': None, 'review_required': True}, 'Clear the unverified wage and flag for follow-up. This does not establish the correct wage.'
+    try:
+        number = float(value)
+    except (ValueError, TypeError):
+        raise ValueError('Enter a valid number.')
+    if not math.isfinite(number):
+        raise ValueError('Enter a finite number.')
+    if resolution == 'correct_wage':
+        if not 1 <= number <= 200:
+            raise ValueError('The confirmed wage must be within the demo plausibility range of $1 to $200. Otherwise use follow-up.')
+        return {'hourly_wage': number}, 'Record the confirmed hourly wage.'
+    if number < 0:
+        raise ValueError('Service units cannot be negative.')
+    return {'units': number}, 'Record the confirmed service units.'
+
+
+def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', replaces_id=None):
+    if '@' in issue_key:
+        raise ValueError('Use the original finding key, not a historical proposal key.')
+    issue = next((x for x in issues() if x['key'] == issue_key), None)
+    if not issue:
+        raise ValueError('Issue does not exist or no longer applies. Refresh Data Health.')
+    resolution = resolution or ('clear_wage' if issue['kind'] == 'wage_outlier' else 'follow_up')
+    after, explanation = correction_patch(issue, resolution, value, evidence)
+    before = dict(issue['record'])
+    reason = issue['reason'] + '\nAction: ' + explanation
+    if evidence.strip():
+        reason += '\nEvidence / confirmation: ' + evidence.strip()
+    item = dict(id=str(uuid.uuid4()), issue_key=issue_key, table_name=issue['table'], record_id=issue['record_id'],
+                before=before, after=after, reason=reason, status='pending', created_at=now(), decided_at=None, decided_by=None)
     try:
         with engine.begin() as c:
-            c.execute(proposals.insert().values(**item));log(c,'proposal_created',item,actor)
-    except IntegrityError:
-        with engine.connect() as c: return dict(c.execute(select(proposals).where(proposals.c.issue_key==issue_key)).mappings().one())
+            serialize_writes(c)
+            # Lock the source before proposal rows, consistently with decide().
+            t = DATA_TABLES[issue['table']]
+            if issue['table'] == 'clients':
+                from backend.merges import active
+                active(c, issue['record_id'])
+            current = c.execute(select(t).where(t.c.id == issue['record_id']).with_for_update()).mappings().one()
+            if dict(current) != before:
+                raise Conflict('Record changed while creating the proposal. Refresh and try again.')
+            old = c.execute(select(proposals).where(proposals.c.issue_key == issue_key).with_for_update()).mappings().first()
+            if replaces_id and (not old or old['id'] != replaces_id or old['status'] != 'pending'):
+                raise Conflict('The pending proposal has changed. Refresh before replacing it.')
+            if old and old['status'] == 'pending' and not replaces_id:
+                if old['after'] == after and old['reason'] == reason and old['before'] == before:
+                    return dict(old)
+                raise Conflict('A pending proposal already exists. Open it and choose Replace proposal.')
+            if old:
+                # Keep old IDs, decisions and audit events. Free the unique finding key for its new revision.
+                changes = {'issue_key': issue_key + '@' + old['id']}
+                if old['status'] == 'pending':
+                    changes.update(status='superseded', decided_at=now(), decided_by=actor)
+                changed = c.execute(update(proposals).where(proposals.c.id == old['id'], proposals.c.status == old['status'],
+                                                           proposals.c.issue_key == issue_key).values(**changes))
+                if changed.rowcount != 1:
+                    raise Conflict('Another request changed this proposal. Refresh and try again.')
+                log(c, 'proposal_superseded' if old['status'] == 'pending' else 'proposal_reopened',
+                    {'proposal_id': old['id'], 'replacement_id': item['id'], 'issue_key': issue_key,
+                     'previous_status': old['status'], 'before': old['before'], 'after': old['after']}, actor)
+            c.execute(proposals.insert().values(**item))
+            log(c, 'proposal_created', item, actor)
+    except IntegrityError as exc:
+        raise Conflict('A proposal was created by another request. Refresh before continuing.') from exc
     return item
 
-def decide(proposal_id,decision,actor):
-    if decision not in ('approve','reject'):raise ValueError('Invalid decision.')
+
+def decide(proposal_id, decision, actor):
+    if decision not in ('approve', 'reject'):
+        raise ValueError('Invalid decision.')
     with engine.begin() as c:
-        item=c.execute(select(proposals).where(proposals.c.id==proposal_id).with_for_update()).mappings().first()
-        if not item:raise ValueError('Proposal not found.')
-        if item['status']!='pending':raise Conflict('This proposal has already been decided.')
-        status='applied' if decision=='approve' else 'rejected'
-        # Compare-and-swap also protects the SQLite test fallback.
-        claim=c.execute(update(proposals).where(proposals.c.id==proposal_id,proposals.c.status=='pending').values(status=status,decided_at=now(),decided_by=actor))
-        if claim.rowcount!=1:raise Conflict('Another reviewer already decided this proposal.')
-        if decision=='approve':
-            t=DATA_TABLES[item['table_name']]
-            stmt=update(t).where(t.c.id==item['record_id'])
-            for key,val in item['before'].items():stmt=stmt.where(t.c[key]==val)
-            changed=c.execute(stmt.values(**item['after']))
-            if changed.rowcount!=1:raise Conflict('Record changed after this proposal was created. No changes applied.')
-        log(c,'proposal_'+status,{'proposal_id':proposal_id,'table':item['table_name'],'record_id':item['record_id'],'before':item['before'],'after':item['after'] if decision=='approve' else item['before']},actor)
-    return {'id':proposal_id,'status':status}
+        serialize_writes(c)
+        found = c.execute(select(proposals).where(proposals.c.id == proposal_id)).mappings().first()
+        if not found:
+            raise ValueError('Proposal not found.')
+        if found['after'].get('action') == 'merge_clients':
+            from backend.merges import decide_merge
+            return decide_merge(c, found, decision, actor)
+        if decision == 'approve' and found['table_name'] == 'clients':
+            from backend.db import client_merges
+            if c.scalar(select(client_merges.c.source_id).where(client_merges.c.source_id == found['record_id'])):
+                raise Conflict('This profile was merged. Refresh and review the active profile.')
+        t = DATA_TABLES[found['table_name']]
+        c.execute(select(t.c.id).where(t.c.id == found['record_id']).with_for_update()).first()
+        item = c.execute(select(proposals).where(proposals.c.id == proposal_id).with_for_update()).mappings().one()
+        if item['status'] != 'pending':
+            raise Conflict('This proposal has already been decided or replaced.')
+        status = 'applied' if decision == 'approve' else 'rejected'
+        claim = c.execute(update(proposals).where(proposals.c.id == proposal_id, proposals.c.status == 'pending')
+                          .values(status=status, decided_at=now(), decided_by=actor))
+        if claim.rowcount != 1:
+            raise Conflict('Another reviewer already decided this proposal.')
+        if decision == 'approve':
+            stmt = update(t).where(t.c.id == item['record_id'])
+            for key, val in item['before'].items():
+                stmt = stmt.where(t.c[key] == val)
+            changed = c.execute(stmt.values(**item['after']))
+            if changed.rowcount != 1:
+                raise Conflict('Record changed after this proposal was created. No changes applied. Replace the proposal using current information.')
+        log(c, 'proposal_' + status, {'proposal_id': proposal_id, 'table': item['table_name'], 'record_id': item['record_id'],
+                                     'before': item['before'], 'after': item['after'] if decision == 'approve' else item['before']}, actor)
+    return {'id': proposal_id, 'status': status}

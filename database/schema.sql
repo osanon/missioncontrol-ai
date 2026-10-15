@@ -81,6 +81,21 @@ CREATE TABLE assessments (
 ;
 
 
+CREATE TABLE client_merges (
+	source_id INTEGER NOT NULL, 
+	target_id INTEGER NOT NULL, 
+	proposal_id VARCHAR NOT NULL, 
+	merged_at VARCHAR NOT NULL, 
+	merged_by VARCHAR NOT NULL, 
+	PRIMARY KEY (source_id), 
+	CONSTRAINT different_merge_profiles CHECK (source_id <> target_id), 
+	FOREIGN KEY(source_id) REFERENCES clients (id), 
+	FOREIGN KEY(target_id) REFERENCES clients (id)
+)
+
+;
+
+
 CREATE TABLE employment (
 	id SERIAL NOT NULL, 
 	client_id INTEGER NOT NULL, 

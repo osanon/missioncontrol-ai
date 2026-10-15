@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, Boolean, ForeignKey, JSON, text
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, Boolean, ForeignKey, JSON, text, CheckConstraint
 
 metadata = MetaData()
 clients = Table('clients', metadata, Column('id', Integer, primary_key=True), Column('external_id', String, unique=True), Column('full_name', String, nullable=False), Column('birth_date', String(10)), Column('email', String), Column('review_required', Boolean, nullable=False, default=False))
@@ -14,7 +14,8 @@ surveys = Table('surveys', metadata, Column('id', Integer, primary_key=True), Co
 proposals = Table('proposed_actions', metadata, Column('id', String, primary_key=True), Column('issue_key', String, unique=True), Column('table_name', String, nullable=False), Column('record_id', Integer, nullable=False), Column('before', JSON, nullable=False), Column('after', JSON, nullable=False), Column('reason', String, nullable=False), Column('status', String, nullable=False), Column('created_at', String, nullable=False), Column('decided_at', String), Column('decided_by', String))
 audit = Table('audit_records', metadata, Column('id', String, primary_key=True), Column('occurred_at', String, nullable=False), Column('actor', String, nullable=False), Column('event', String, nullable=False), Column('details', JSON, nullable=False))
 runs = Table('agent_runs', metadata, Column('id', String, primary_key=True), Column('created_at', String, nullable=False), Column('question', String, nullable=False), Column('answer', String, nullable=False), Column('mode', String, nullable=False), Column('trace', JSON, nullable=False))
-DATA_TABLES = {t.name:t for t in [clients, programs, enrollments, services, employment, housing, assessments, followups, surveys]}
+client_merges = Table('client_merges', metadata, Column('source_id', ForeignKey('clients.id'), primary_key=True), Column('target_id', ForeignKey('clients.id'), nullable=False), Column('proposal_id', String, nullable=False), Column('merged_at', String, nullable=False), Column('merged_by', String, nullable=False), CheckConstraint('source_id <> target_id', name='different_merge_profiles'))
+DATA_TABLES = {t.name:t for t in [clients, programs, enrollments, services, employment, housing, assessments, followups, surveys, client_merges]}
 
 def engine_for(url):
     return create_engine(url, pool_pre_ping=True, **({'connect_args': {'check_same_thread':False}} if url.startswith('sqlite') else {}))
