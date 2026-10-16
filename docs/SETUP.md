@@ -88,7 +88,7 @@ The address will resemble `https://YOUR-CODESPACE-8080.app.github.dev`. Use that
 
 Private is GitHub's default visibility, but `forwardPorts` by itself is not a visibility policy. Check the actual Ports panel. Only port 8080 is needed; PostgreSQL and FastAPI stay inside the application network.
 
-In the Codespace Explorer, open `.env`. Copy the value after `APP_TOKEN=` into the app's Analyst access token field. Copy `REVIEW_TOKEN` into the app's Connection settings only when testing approvals. These are demo role tokens, not individual accounts. Never commit them or paste them into shared chat.
+In the Codespace Explorer, open `.env`. Copy the value after `APP_TOKEN=` into the app's Analyst access token field. To review proposals, copy your personal token (the part after `yourname:` in `REVIEWERS=`) into the app's Connection settings and select Verify. Decisions are recorded under that name. Add a reviewer with `python scripts/configure.py --add-reviewer NAME`, then `docker compose up -d backend`. These tokens are a stand-in until Google/Microsoft sign-in is added. Never commit them or paste them into shared chat.
 
 ## 8. Run the no-key demo
 

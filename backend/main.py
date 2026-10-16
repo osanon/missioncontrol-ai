@@ -8,12 +8,12 @@ from sqlalchemy import text,select
 from backend.db import engine,reader,schema,proposals,audit,runs
 from backend.logic import metrics,cohorts,issues,propose,decide,Conflict,list_proposals
 from agent.runner import run
+from backend.reviewers import load_reviewers,reviewer_for_token
 
 @asynccontextmanager
 async def lifespan(app):
-    for key in ('APP_TOKEN','REVIEW_TOKEN'):
-        if len(os.getenv(key,''))<24:raise RuntimeError(f'Set {key} to a random value of at least 24 characters.')
-    if os.environ['APP_TOKEN']==os.environ['REVIEW_TOKEN']:raise RuntimeError('Use different analyst and reviewer tokens.')
+    if len(os.getenv('APP_TOKEN',''))<24:raise RuntimeError('Set APP_TOKEN to a random value of at least 24 characters.')
+    if not load_reviewers():raise RuntimeError('Configure at least one reviewer in REVIEWERS (run python scripts/configure.py --add-reviewer NAME).')
     yield
 
 app=FastAPI(title='MissionControl AI',version='0.1.0',lifespan=lifespan)
@@ -23,9 +23,9 @@ def auth(authorization: str=Header(default='')):
     if not expected or not secrets.compare_digest(authorization,'Bearer '+expected):raise HTTPException(401,'Enter the analyst access token.')
 
 def reviewer(x_review_token: str=Header(default='')):
-    expected=os.getenv('REVIEW_TOKEN','')
-    if not expected or not secrets.compare_digest(x_review_token,expected):raise HTTPException(403,'A reviewer token is required to decide proposals.')
-    return 'local-reviewer'
+    name=reviewer_for_token(x_review_token) if x_review_token else None
+    if not name:raise HTTPException(403,'A personal reviewer token is required to decide proposals.')
+    return name
 
 class Ask(BaseModel):
     question:str=Field(min_length=3,max_length=2000)
@@ -46,7 +46,10 @@ class MergeProposal(BaseModel):
     preview_token: str = Field(pattern=r'^[a-f0-9]{64}$')
     evidence: str = Field(min_length=10, max_length=2000)
     replaces_id: str | None = Field(default=None, max_length=100)
-class Decision(BaseModel):decision:Literal['approve','reject']
+class Decision(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    decision: Literal['approve','reject','reevaluate']
+    note: str = Field(default='', max_length=2000)
 
 @app.exception_handler(ValueError)
 async def validation_error(request,exc):
@@ -68,12 +71,14 @@ def get_cohorts(start:str='2026-07-01',end:str='2026-09-30'):return cohorts(star
 @app.get('/issues',dependencies=[Depends(auth)])
 def get_issues():return issues()
 @app.post('/proposals',dependencies=[Depends(auth)],status_code=201)
-def post_proposal(body:Proposal):return propose(**body.model_dump())
+def post_proposal(body:Proposal):return propose(**body.model_dump(),actor='analyst',actor_kind='human')
 @app.get('/proposals',dependencies=[Depends(auth)])
 def get_proposals():
     return list_proposals()
 @app.post('/approvals/{proposal_id}',dependencies=[Depends(auth)])
-def post_decision(proposal_id:str,body:Decision,actor:str=Depends(reviewer)):return decide(proposal_id,body.decision,actor)
+def post_decision(proposal_id:str,body:Decision,actor:str=Depends(reviewer)):return decide(proposal_id,body.decision,actor,body.note)
+@app.get('/reviewer',dependencies=[Depends(auth)])
+def who_am_i(actor:str=Depends(reviewer)):return {'name':actor}
 @app.get('/audit-log',dependencies=[Depends(auth)])
 def get_audit(limit:int=Query(100,ge=1,le=500)):
     with engine.connect() as c:return [dict(x) for x in c.execute(select(audit).order_by(audit.c.occurred_at.desc()).limit(limit)).mappings()]
@@ -90,7 +95,8 @@ def report(run_id:str):
     if not item:raise HTTPException(404,'Report not found.')
     import json
     evidence='\n\n'.join(f"## Step {s['step']}: {s['tool']}\n```json\n{json.dumps(s,indent=2,default=str)}\n```" for s in item['trace'])
-    return f"# MissionControl AI investigation\n\nFictional data | Mode: {item['mode']} | {item['created_at']}\n\nQuestion: {item['question']}\n\n{item['answer']}\n\n# Evidence\n\n{evidence}"
+    status='' if item['status']=='completed' else f" | Status: {item['status']}"
+    return f"# MissionControl AI investigation\n\nFictional data | Mode: {item['mode']}{status} | {item['created_at']}\n\nQuestion: {item['question']}\n\n{item['answer']}\n\n# Evidence\n\n{evidence}"
 
 @app.get('/clients/{client_id}/duplicates',dependencies=[Depends(auth)])
 def candidates(client_id:int):
@@ -103,4 +109,4 @@ def preview_merge(source_id:int=Query(gt=0),target_id:int=Query(gt=0),replaces_i
 @app.post('/merges',dependencies=[Depends(auth)],status_code=201)
 def create_merge(body:MergeProposal):
     from backend.merges import propose_merge
-    return propose_merge(**body.model_dump())
+    return propose_merge(**body.model_dump(),actor='analyst',actor_kind='human')

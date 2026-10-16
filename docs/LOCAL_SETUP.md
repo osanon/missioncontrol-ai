@@ -24,7 +24,7 @@ Windows: substitute `py` for `python` if needed. macOS/Linux: substitute `python
 python scripts/configure.py
 ```
 
-This creates `.env` with randomly generated database passwords, an analyst access token, and a separate reviewer token. It preserves any existing `.env`. Do not commit `.env` to Git. Generated passwords use hexadecimal characters so they work inside connection URLs without escaping.
+This creates `.env` with randomly generated database passwords, an analyst access token, and a personal reviewer token (`REVIEWERS=reviewer:<token>`; choose the name with `--first-reviewer NAME`, add people later with `--add-reviewer NAME`). It preserves any existing `.env`. Do not commit `.env` to Git. Generated passwords use hexadecimal characters so they work inside connection URLs without escaping.
 
 ## 3. Build and start
 
@@ -57,8 +57,8 @@ Use the default reporting period July 1–September 30, 2026. Click **Quarterly 
 2. Inspect a source record. Some deliberately incorrect wages are -15 or 1500.
 3. Choose Propose review. This creates a proposal without changing the source record.
 4. Open Approvals & Audit. Review the before/after fields. A wage proposal clears the unverified value and sets `review_required=true`; it does not invent a correct wage.
-5. Add your `REVIEW_TOKEN` value through Connection settings.
-6. Approve & apply, or reject. The audit log records the outcome.
+5. Add your personal reviewer token (from `REVIEWERS`) through Connection settings and select Verify.
+6. Approve & apply, reject, or send back with a note. The audit log records the outcome under your reviewer name.
 
 For duplicates and uncertain dates, the controlled action adds a review flag only. The finding remains visible until the source issue is actually resolved. This MVP allows one proposal per issue key; rejected or stale proposals are retained, and a revision workflow is a planned enhancement.
 
@@ -110,7 +110,7 @@ python -m pip install -r backend/requirements.txt
 python -m database.seed
 ```
 
-Set `APP_TOKEN` and `REVIEW_TOKEN` in your shell to different random values of at least 24 characters; `.env` is read by Compose, not automatically by direct Python commands. Then run:
+Set `APP_TOKEN` and `REVIEWERS` (for example `REVIEWERS=yourname:<random token>`) in your shell, using different random values of at least 24 characters; `.env` is read by Compose, not automatically by direct Python commands. Then run:
 
 ```sh
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000

@@ -72,6 +72,25 @@ def issues():
 
 class Conflict(ValueError): pass
 
+# A human reviewer can send a proposal back; the agent (or analyst) then submits a replacement.
+REPLACEABLE = ('pending', 'reevaluation_requested')
+DECISION_STATUS = {'approve': 'applied', 'reject': 'rejected', 'reevaluate': 'reevaluation_requested'}
+
+
+def check_decision(found, decision, actor, note):
+    if decision not in DECISION_STATUS:
+        raise ValueError('Invalid decision.')
+    if decision == 'reevaluate' and len(note.strip()) < 10:
+        raise ValueError('Explain what should be reevaluated (at least 10 characters).')
+    if found.get('created_by') and found['created_by'] == actor:
+        raise Conflict('Proposals must be decided by someone other than their author.')
+
+
+def provenance(actor, actor_kind, run_id, model):
+    if actor_kind not in ('human', 'agent'):
+        raise ValueError('Unknown proposal author type.')
+    return {'created_by': actor, 'created_by_kind': actor_kind, 'run_id': run_id, 'model': model}
+
 
 def record_context(table, record):
     client_id = record.get('id') if table == 'clients' else record.get('client_id')
@@ -153,7 +172,8 @@ def correction_patch(issue, resolution, value, evidence):
     return {'units': number}, 'Record the confirmed service units.'
 
 
-def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', replaces_id=None):
+def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', replaces_id=None,
+            actor_kind='human', run_id=None, model=None):
     if '@' in issue_key:
         raise ValueError('Use the original finding key, not a historical proposal key.')
     issue = next((x for x in issues() if x['key'] == issue_key), None)
@@ -166,7 +186,8 @@ def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', 
     if evidence.strip():
         reason += '\nEvidence / confirmation: ' + evidence.strip()
     item = dict(id=str(uuid.uuid4()), issue_key=issue_key, table_name=issue['table'], record_id=issue['record_id'],
-                before=before, after=after, reason=reason, status='pending', created_at=now(), decided_at=None, decided_by=None)
+                before=before, after=after, reason=reason, status='pending', created_at=now(), decided_at=None, decided_by=None,
+                supersedes_id=None, decision_note=None, **provenance(actor, actor_kind, run_id, model))
     try:
         with engine.begin() as c:
             serialize_writes(c)
@@ -179,7 +200,7 @@ def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', 
             if dict(current) != before:
                 raise Conflict('Record changed while creating the proposal. Refresh and try again.')
             old = c.execute(select(proposals).where(proposals.c.issue_key == issue_key).with_for_update()).mappings().first()
-            if replaces_id and (not old or old['id'] != replaces_id or old['status'] != 'pending'):
+            if replaces_id and (not old or old['id'] != replaces_id or old['status'] not in REPLACEABLE):
                 raise Conflict('The pending proposal has changed. Refresh before replacing it.')
             if old and old['status'] == 'pending' and not replaces_id:
                 if old['after'] == after and old['reason'] == reason and old['before'] == before:
@@ -187,6 +208,7 @@ def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', 
                 raise Conflict('A pending proposal already exists. Open it and choose Replace proposal.')
             if old:
                 # Keep old IDs, decisions and audit events. Free the unique finding key for its new revision.
+                item['supersedes_id'] = old['id']
                 changes = {'issue_key': issue_key + '@' + old['id']}
                 if old['status'] == 'pending':
                     changes.update(status='superseded', decided_at=now(), decided_by=actor)
@@ -194,7 +216,7 @@ def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', 
                                                            proposals.c.issue_key == issue_key).values(**changes))
                 if changed.rowcount != 1:
                     raise Conflict('Another request changed this proposal. Refresh and try again.')
-                log(c, 'proposal_superseded' if old['status'] == 'pending' else 'proposal_reopened',
+                log(c, {'pending': 'proposal_superseded', 'reevaluation_requested': 'proposal_revised'}.get(old['status'], 'proposal_reopened'),
                     {'proposal_id': old['id'], 'replacement_id': item['id'], 'issue_key': issue_key,
                      'previous_status': old['status'], 'before': old['before'], 'after': old['after']}, actor)
             c.execute(proposals.insert().values(**item))
@@ -204,17 +226,19 @@ def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', 
     return item
 
 
-def decide(proposal_id, decision, actor):
-    if decision not in ('approve', 'reject'):
+def decide(proposal_id, decision, actor, note=''):
+    if decision not in DECISION_STATUS:
         raise ValueError('Invalid decision.')
+    note = (note or '').strip()
     with engine.begin() as c:
         serialize_writes(c)
         found = c.execute(select(proposals).where(proposals.c.id == proposal_id)).mappings().first()
         if not found:
             raise ValueError('Proposal not found.')
+        check_decision(found, decision, actor, note)
         if found['after'].get('action') == 'merge_clients':
             from backend.merges import decide_merge
-            return decide_merge(c, found, decision, actor)
+            return decide_merge(c, found, decision, actor, note)
         if decision == 'approve' and found['table_name'] == 'clients':
             from backend.db import client_merges
             if c.scalar(select(client_merges.c.source_id).where(client_merges.c.source_id == found['record_id'])):
@@ -224,9 +248,9 @@ def decide(proposal_id, decision, actor):
         item = c.execute(select(proposals).where(proposals.c.id == proposal_id).with_for_update()).mappings().one()
         if item['status'] != 'pending':
             raise Conflict('This proposal has already been decided or replaced.')
-        status = 'applied' if decision == 'approve' else 'rejected'
+        status = DECISION_STATUS[decision]
         claim = c.execute(update(proposals).where(proposals.c.id == proposal_id, proposals.c.status == 'pending')
-                          .values(status=status, decided_at=now(), decided_by=actor))
+                          .values(status=status, decided_at=now(), decided_by=actor, decision_note=note or None))
         if claim.rowcount != 1:
             raise Conflict('Another reviewer already decided this proposal.')
         if decision == 'approve':
@@ -237,5 +261,6 @@ def decide(proposal_id, decision, actor):
             if changed.rowcount != 1:
                 raise Conflict('Record changed after this proposal was created. No changes applied. Replace the proposal using current information.')
         log(c, 'proposal_' + status, {'proposal_id': proposal_id, 'table': item['table_name'], 'record_id': item['record_id'],
-                                     'before': item['before'], 'after': item['after'] if decision == 'approve' else item['before']}, actor)
+                                     'before': item['before'], 'after': item['after'] if decision == 'approve' else item['before'],
+                                     'note': note or None, 'proposed_by': item['created_by'], 'run_id': item['run_id']}, actor)
     return {'id': proposal_id, 'status': status}

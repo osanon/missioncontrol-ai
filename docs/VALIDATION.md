@@ -61,6 +61,7 @@ Do not substitute your main project name into the cleanup command if you want to
 3. Confirm the source card identifies PostgreSQL.
 4. Run the quarterly briefing and inspect the evidence.
 5. Create an outlier-wage proposal; verify approving without a reviewer token is unavailable.
-6. Supply `REVIEW_TOKEN`, approve once, and verify the audit event and changed source value.
+6. Supply your personal reviewer token, approve once, and verify the audit event names you and the source value changed.
+6a. Create another proposal, send it back with a note, and confirm it shows as Sent back in Decision history with a Revise proposal action.
 7. Restart the stack and confirm the decision persisted.
 8. Enable live inference and run the prompts in DEMO_SCRIPT.md. Confirm queries and narrative agree with the evidence.

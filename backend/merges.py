@@ -5,7 +5,7 @@ import secrets
 import uuid
 from sqlalchemy import select, update
 from backend.db import engine, clients, client_merges, DATA_TABLES, proposals, followups
-from backend.logic import Conflict, now, log
+from backend.logic import Conflict, now, log, provenance, REPLACEABLE, DECISION_STATUS
 from backend.mutations import serialize_writes
 
 LINK_TABLES = ('enrollments', 'services', 'employment', 'housing', 'assessments')
@@ -88,7 +88,7 @@ def validate_replacement(c, replacing, source_id, target_id):
     if not replacing:
         return
     old = c.execute(select(proposals).where(proposals.c.id == replacing)).mappings().first()
-    if not old or old['status'] != 'pending' or old['after'].get('action') != 'merge_clients' or \
+    if not old or old['status'] not in REPLACEABLE or old['after'].get('action') != 'merge_clients' or \
             {old['after']['source_id'], old['after']['target_id']} != {source_id, target_id}:
         raise Conflict('The merge proposal has changed. Refresh before replacing it.')
 
@@ -99,7 +99,8 @@ def merge_preview(source_id, target_id, replaces_id=None):
         return preview_data(snapshot(c, source_id, target_id, replaces_id))
 
 
-def propose_merge(source_id, target_id, preview_token, evidence, replaces_id=None, actor='analyst'):
+def propose_merge(source_id, target_id, preview_token, evidence, replaces_id=None, actor='analyst',
+                  actor_kind='human', run_id=None, model=None):
     if len(evidence.strip()) < 10:
         raise ValueError('Describe the identity confirmation supporting this merge (at least 10 characters).')
     key = 'merge:' + ':'.join(str(x) for x in sorted([source_id, target_id]))
@@ -115,20 +116,24 @@ def propose_merge(source_id, target_id, preview_token, evidence, replaces_id=Non
         item = dict(id=str(uuid.uuid4()), issue_key=key, table_name='clients', record_id=source_id,
                     before=before, after={'action': 'merge_clients', 'source_id': source_id, 'target_id': target_id,
                     'review_required': before['source']['review_required'] or before['target']['review_required']},
-                    reason=evidence.strip(), status='pending', created_at=now(), decided_at=None, decided_by=None)
+                    reason=evidence.strip(), status='pending', created_at=now(), decided_at=None, decided_by=None,
+                    supersedes_id=old['id'] if old else None, decision_note=None, **provenance(actor, actor_kind, run_id, model))
         if old:
             changes = {'issue_key': key + '@' + old['id']}
             if old['status'] == 'pending':
                 changes.update(status='superseded', decided_at=now(), decided_by=actor)
-            c.execute(update(proposals).where(proposals.c.id == old['id']).values(**changes))
-            log(c, 'proposal_superseded' if old['status'] == 'pending' else 'proposal_reopened',
+            changed = c.execute(update(proposals).where(proposals.c.id == old['id'], proposals.c.status == old['status'])
+                                .values(**changes))
+            if changed.rowcount != 1:
+                raise Conflict('Another request changed this merge proposal. Refresh and try again.')
+            log(c, {'pending': 'proposal_superseded', 'reevaluation_requested': 'proposal_revised'}.get(old['status'], 'proposal_reopened'),
                 {'proposal_id': old['id'], 'replacement_id': item['id'], 'previous_status': old['status']}, actor)
         c.execute(proposals.insert().values(**item))
         log(c, 'merge_proposed', {'proposal_id': item['id'], 'before': before, 'after': item['after'], 'evidence': item['reason']}, actor)
     return item
 
 
-def decide_merge(c, found, decision, actor):
+def decide_merge(c, found, decision, actor, note=''):
     # Called inside the same serialized transaction as other approvals.
     p = c.execute(select(proposals).where(proposals.c.id == found['id']).with_for_update()).mappings().one()
     if p['status'] != 'pending':
@@ -152,7 +157,9 @@ def decide_merge(c, found, decision, actor):
                 'reason': 'Identity reviewed in approved merge; existing follow-up flags retained.'}, actor)
         log(c, 'clients_merged', {'proposal_id': p['id'], 'source_id': source_id, 'target_id': target_id,
             'before': p['before'], 'after': p['after'], 'moved_record_ids': moved, 'evidence': p['reason']}, actor)
-    status = 'applied' if decision == 'approve' else 'rejected'
-    c.execute(update(proposals).where(proposals.c.id == p['id']).values(status=status, decided_at=now(), decided_by=actor))
-    log(c, 'proposal_' + status, {'proposal_id': p['id'], 'action': 'merge_clients', 'before': p['before'], 'after': p['after']}, actor)
+    status = DECISION_STATUS[decision]
+    c.execute(update(proposals).where(proposals.c.id == p['id']).values(status=status, decided_at=now(), decided_by=actor,
+                                                                       decision_note=note or None))
+    log(c, 'proposal_' + status, {'proposal_id': p['id'], 'action': 'merge_clients', 'before': p['before'], 'after': p['after'],
+                                  'note': note or None, 'proposed_by': p['created_by'], 'run_id': p['run_id']}, actor)
     return {'id': p['id'], 'status': status}

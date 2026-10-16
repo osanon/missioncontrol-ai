@@ -34,7 +34,9 @@ services:
       DATABASE_URL: postgresql+psycopg://mc_app:${APP_DB_PASSWORD}@db:5432/missioncontrol
       READ_DATABASE_URL: postgresql+psycopg://mc_reader:${READER_PASSWORD}@db:5432/missioncontrol
       APP_TOKEN: ${APP_TOKEN:?Run configuration first}
-      REVIEW_TOKEN: ${REVIEW_TOKEN:?Run configuration first}
+      REVIEWERS: ${REVIEWERS:-}
+      # Legacy single reviewer token; still accepted as the reviewer named "reviewer".
+      REVIEW_TOKEN: ${REVIEW_TOKEN:-}
       AGENT_MODE: ${AGENT_MODE:-demo}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-}
