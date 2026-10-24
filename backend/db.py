@@ -17,7 +17,13 @@ proposals = Table('proposed_actions', metadata, Column('id', String, primary_key
     Column('supersedes_id', String), Column('decision_note', String))
 audit = Table('audit_records', metadata, Column('id', String, primary_key=True), Column('occurred_at', String, nullable=False), Column('actor', String, nullable=False), Column('event', String, nullable=False), Column('details', JSON, nullable=False))
 runs = Table('agent_runs', metadata, Column('id', String, primary_key=True), Column('created_at', String, nullable=False), Column('question', String, nullable=False), Column('answer', String, nullable=False), Column('mode', String, nullable=False), Column('trace', JSON, nullable=False),
-    Column('status', String, nullable=False, server_default='completed'), Column('error', String), Column('model', String))
+    Column('status', String, nullable=False, server_default='completed'), Column('error', String), Column('model', String),
+    Column('kind', String, nullable=False, server_default='analyst'), Column('input_tokens', Integer), Column('output_tokens', Integer))
+# Independent AI reviews of proposals. A review never changes data or decides; people do.
+ai_reviews = Table('ai_reviews', metadata, Column('id', String, primary_key=True), Column('proposal_id', ForeignKey('proposed_actions.id'), nullable=False, index=True),
+    Column('run_id', String, nullable=False), Column('reviewer', String, nullable=False), Column('mode', String, nullable=False), Column('model', String),
+    Column('verdict', String, nullable=False), Column('confidence', String, nullable=False), Column('summary', String, nullable=False),
+    Column('concerns', JSON, nullable=False), Column('created_at', String, nullable=False))
 client_merges = Table('client_merges', metadata, Column('source_id', ForeignKey('clients.id'), primary_key=True), Column('target_id', ForeignKey('clients.id'), nullable=False), Column('proposal_id', String, nullable=False), Column('merged_at', String, nullable=False), Column('merged_by', String, nullable=False), CheckConstraint('source_id <> target_id', name='different_merge_profiles'))
 DATA_TABLES = {t.name:t for t in [clients, programs, enrollments, services, employment, housing, assessments, followups, surveys, client_merges]}
 

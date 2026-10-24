@@ -5,7 +5,7 @@
 The target: AI agents find issues, propose corrections and review each other's proposals; people only approve, reject, or send back.
 
 1. **Foundations (done; see PHASE1_UPDATE.md):** personal reviewer identities, send back for reevaluation, proposal provenance, reliable live runs, Alembic migrations.
-2. **AI reviewer agent and approval queue:** proposals pass through an independent reviewer agent (its only write tool is `submit_review`) before reaching people; the queue highlights disagreements and low confidence.
+2. **AI reviewer agent and approval queue (done; see PHASE2_UPDATE.md):** an independent reviewer agent (its only write tool is `submit_review`) checks proposals; the queue puts disagreements first. Runs on demand; phase 3 chains it automatically after proposals.
 3. **"Perform health check" button and worker:** the SQL scan stays free; AI work runs only when a person starts it. Runs are recorded with token use and cost, skip findings already handled, stop at a token limit, and can be cancelled. Sent-back items are re-proposed immediately.
 4. **"Live health checks" toggle:** an opt-in schedule with a daily token budget, off by default.
 5. **Evidence sources and evaluation:** connect the sources agents may cite (for example payroll or case-management exports) and measure proposal precision against the planted anomalies.

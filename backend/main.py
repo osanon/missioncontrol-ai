@@ -54,7 +54,8 @@ class Decision(BaseModel):
 @app.exception_handler(ValueError)
 async def validation_error(request,exc):
     from fastapi.responses import JSONResponse
-    return JSONResponse(status_code=409 if isinstance(exc,Conflict) else 400,content={'detail':str(exc)})
+    from agent.llm import ProviderError
+    return JSONResponse(status_code=409 if isinstance(exc,Conflict) else 502 if isinstance(exc,ProviderError) else 400,content={'detail':str(exc)})
 
 @app.get('/health-check')
 def health():
@@ -89,6 +90,15 @@ def ask(body:Ask):
         with engine.connect() as c:previous=c.execute(select(runs).where(runs.c.id==body.previous_run_id)).mappings().first()
         if previous is None:raise HTTPException(404,'Previous investigation not found.')
     return run(body.question,body.start,body.end,previous)
+@app.post('/proposals/{proposal_id}/ai-review',dependencies=[Depends(auth)],status_code=201)
+def ai_review(proposal_id:str):
+    from agent.reviewer import review_proposal
+    return review_proposal(proposal_id)
+@app.get('/runs/{run_id}',dependencies=[Depends(auth)])
+def get_run(run_id:str):
+    with engine.connect() as c:item=c.execute(select(runs).where(runs.c.id==run_id)).mappings().first()
+    if not item:raise HTTPException(404,'Run not found.')
+    return dict(item)
 @app.get('/reports/{run_id}',dependencies=[Depends(auth)],response_class=PlainTextResponse)
 def report(run_id:str):
     with engine.connect() as c:item=c.execute(select(runs).where(runs.c.id==run_id)).mappings().first()
@@ -96,7 +106,8 @@ def report(run_id:str):
     import json
     evidence='\n\n'.join(f"## Step {s['step']}: {s['tool']}\n```json\n{json.dumps(s,indent=2,default=str)}\n```" for s in item['trace'])
     status='' if item['status']=='completed' else f" | Status: {item['status']}"
-    return f"# MissionControl AI investigation\n\nFictional data | Mode: {item['mode']}{status} | {item['created_at']}\n\nQuestion: {item['question']}\n\n{item['answer']}\n\n# Evidence\n\n{evidence}"
+    title='AI review' if item['kind']=='reviewer' else 'AI investigation'
+    return f"# MissionControl {title}\n\nFictional data | Mode: {item['mode']}{status} | {item['created_at']}\n\nQuestion: {item['question']}\n\n{item['answer']}\n\n# Evidence\n\n{evidence}"
 
 @app.get('/clients/{client_id}/duplicates',dependencies=[Depends(auth)])
 def candidates(client_id:int):

@@ -5,7 +5,7 @@ def test_live_tool_loop_with_mock_provider(monkeypatch):
     monkeypatch.setenv('AGENT_MODE','live')
     monkeypatch.setenv('LLM_API_KEY','fake-test-key')
     monkeypatch.setenv('LLM_MODEL','gpt-5.4-mini')
-    from agent import runner
+    from agent import llm
     requests=[]
     class Response:
         def raise_for_status(self): pass
@@ -16,7 +16,7 @@ def test_live_tool_loop_with_mock_provider(monkeypatch):
     def fake_post(url,**kwargs):
         requests.append(kwargs['json'])
         return Response()
-    monkeypatch.setattr(runner.httpx,'post',fake_post)
+    monkeypatch.setattr(llm.httpx,'post',fake_post)
     result=run('How many clients were served?','2026-07-01','2026-09-30')
     assert result['mode']=='live'
     assert result['trace'][0]['result']['clients_served']==581

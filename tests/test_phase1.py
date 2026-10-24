@@ -150,11 +150,11 @@ class Provider:
     """Scripted chat-completions provider: each entry is a response body or an exception."""
     def __init__(self, monkeypatch, *script):
         self.script, self.requests = list(script), []
-        from agent import runner
+        from agent import llm
         monkeypatch.setenv('AGENT_MODE', 'live')
         monkeypatch.setenv('LLM_API_KEY', 'fake-test-key')
         monkeypatch.setenv('LLM_MODEL', 'test-model')
-        monkeypatch.setattr(runner.httpx, 'post', self.post)
+        monkeypatch.setattr(llm.httpx, 'post', self.post)
 
     def post(self, url, **kwargs):
         self.requests.append(kwargs['json'])

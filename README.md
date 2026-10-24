@@ -28,6 +28,7 @@ The generated `.env` is private to the cloud workspace and ignored by Git. `LLM_
 - Live AI adapter: configurable Chat Completions endpoint and model; bounded tool loop; server-side key.
 - PostgreSQL roles: initialization owner, read-only analyst, and constrained application account.
 - Alembic migrations: schema changes apply automatically on startup and keep existing data. See [phase 1 update](docs/PHASE1_UPDATE.md).
+- Independent AI reviewer: checks a pending proposal against the data and gives people a verdict, confidence and concerns; it can never approve or change anything. Runs only when someone selects **Run AI review**. See [phase 2 update](docs/PHASE2_UPDATE.md).
 - `.devcontainer/` configuration, cloud startup script, cloud cost guide, and optional local instructions.
 
 | Folder | Purpose |
@@ -44,7 +45,7 @@ The generated `.env` is private to the cloud workspace and ignored by Git. `LLM_
 
 ## Status
 
-Phase 1 (reviewer identities, reevaluation, provenance, reliable live runs, migrations) is checked with 92 backend tests passing on PostgreSQL 16 using the real `mc_reader`/`mc_app` roles (88 on SQLite, where the 4 PostgreSQL role tests are skipped), a successful frontend build, a browser walkthrough of the review flow, and an upgrade of a v0.1 PostgreSQL database. See [phase 1 update](docs/PHASE1_UPDATE.md). The new cloud scripts/configuration have been checked locally, but a real Codespace and full Docker/PostgreSQL startup have not yet been run. See [validation](docs/VALIDATION.md).
+Phases 1 and 2 (reviewer identities, reevaluation, provenance, reliable live runs, migrations, and the AI reviewer) are checked with 106 backend tests passing on PostgreSQL 16 using the real `mc_reader`/`mc_app` roles (102 on SQLite, where the 4 PostgreSQL role tests are skipped), a successful frontend build, browser walkthroughs of the review flow, and upgrades of v0.1 and phase 1 PostgreSQL databases. See the [phase 1](docs/PHASE1_UPDATE.md) and [phase 2](docs/PHASE2_UPDATE.md) updates. The new cloud scripts/configuration have been checked locally, but a real Codespace and full Docker/PostgreSQL startup have not yet been run. See [validation](docs/VALIDATION.md).
 
 Vultr hosting, Microsandbox, and MCP remain later milestones. Codespaces is the development workspace, not the final hackathon hosting platform. No repository, paid Codespace, or cloud server has been created by this ZIP update.
 

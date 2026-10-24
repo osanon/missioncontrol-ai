@@ -133,7 +133,7 @@ def propose_merge(source_id, target_id, preview_token, evidence, replaces_id=Non
     return item
 
 
-def decide_merge(c, found, decision, actor, note=''):
+def decide_merge(c, found, decision, actor, note='', ai_details=None):
     # Called inside the same serialized transaction as other approvals.
     p = c.execute(select(proposals).where(proposals.c.id == found['id']).with_for_update()).mappings().one()
     if p['status'] != 'pending':
@@ -161,5 +161,5 @@ def decide_merge(c, found, decision, actor, note=''):
     c.execute(update(proposals).where(proposals.c.id == p['id']).values(status=status, decided_at=now(), decided_by=actor,
                                                                        decision_note=note or None))
     log(c, 'proposal_' + status, {'proposal_id': p['id'], 'action': 'merge_clients', 'before': p['before'], 'after': p['after'],
-                                  'note': note or None, 'proposed_by': p['created_by'], 'run_id': p['run_id']}, actor)
+                                  'note': note or None, 'proposed_by': p['created_by'], 'run_id': p['run_id'], **(ai_details or {})}, actor)
     return {'id': p['id'], 'status': status}

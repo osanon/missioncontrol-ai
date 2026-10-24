@@ -40,6 +40,8 @@ services:
       AGENT_MODE: ${AGENT_MODE:-demo}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-}
+      # Optional separate model for the independent AI reviewer; defaults to LLM_MODEL.
+      LLM_REVIEW_MODEL: ${LLM_REVIEW_MODEL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
     depends_on:
       seed: {condition: service_completed_successfully}

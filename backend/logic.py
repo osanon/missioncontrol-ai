@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import text, select, update
 from sqlalchemy.exc import IntegrityError
 from backend.mutations import serialize_writes
-from backend.db import engine, reader, DATA_TABLES, proposals, audit
+from backend.db import engine, reader, DATA_TABLES, proposals, audit, ai_reviews
 
 def now(): return datetime.now(timezone.utc).isoformat()
 def log(c, event, details, actor='system'):
@@ -101,8 +101,17 @@ def record_context(table, record):
             'program': program[0]['name'] if program else None}
 
 
-def proposal_view(item):
+def latest_reviews(c, proposal_ids=None):
+    """Latest AI review per proposal, in one query."""
+    stmt = select(ai_reviews).order_by(ai_reviews.c.created_at, ai_reviews.c.id)
+    if proposal_ids is not None:
+        stmt = stmt.where(ai_reviews.c.proposal_id.in_(list(proposal_ids)))
+    return {r['proposal_id']: dict(r) for r in c.execute(stmt).mappings()}
+
+
+def proposal_view(item, review=None):
     result = dict(item)
+    result['ai_review'] = review
     t = DATA_TABLES[result['table_name']]
     with engine.connect() as c:
         current = c.execute(select(t).where(t.c.id == result['record_id'])).mappings().first()
@@ -118,7 +127,17 @@ def proposal_view(item):
 def list_proposals():
     with engine.connect() as c:
         rows = list(c.execute(select(proposals).order_by(proposals.c.created_at.desc())).mappings())
-    return [proposal_view(row) for row in rows]
+        reviews = latest_reviews(c)
+    return [proposal_view(row, reviews.get(row['id'])) for row in rows]
+
+
+def get_proposal_view(proposal_id):
+    with engine.connect() as c:
+        row = c.execute(select(proposals).where(proposals.c.id == proposal_id)).mappings().first()
+        if not row:
+            raise ValueError('Proposal not found.')
+        review = latest_reviews(c, [proposal_id]).get(proposal_id)
+    return proposal_view(row, review)
 
 
 def correction_patch(issue, resolution, value, evidence):
@@ -236,9 +255,12 @@ def decide(proposal_id, decision, actor, note=''):
         if not found:
             raise ValueError('Proposal not found.')
         check_decision(found, decision, actor, note)
+        # Record what the AI reviewer said when the person decided, to measure agreement and overrides later.
+        ai = latest_reviews(c, [proposal_id]).get(proposal_id)
+        ai_details = {'ai_review_id': ai and ai['id'], 'ai_verdict': ai and ai['verdict']}
         if found['after'].get('action') == 'merge_clients':
             from backend.merges import decide_merge
-            return decide_merge(c, found, decision, actor, note)
+            return decide_merge(c, found, decision, actor, note, ai_details)
         if decision == 'approve' and found['table_name'] == 'clients':
             from backend.db import client_merges
             if c.scalar(select(client_merges.c.source_id).where(client_merges.c.source_id == found['record_id'])):
@@ -262,5 +284,5 @@ def decide(proposal_id, decision, actor, note=''):
                 raise Conflict('Record changed after this proposal was created. No changes applied. Replace the proposal using current information.')
         log(c, 'proposal_' + status, {'proposal_id': proposal_id, 'table': item['table_name'], 'record_id': item['record_id'],
                                      'before': item['before'], 'after': item['after'] if decision == 'approve' else item['before'],
-                                     'note': note or None, 'proposed_by': item['created_by'], 'run_id': item['run_id']}, actor)
+                                     'note': note or None, 'proposed_by': item['created_by'], 'run_id': item['run_id'], **ai_details}, actor)
     return {'id': proposal_id, 'status': status}

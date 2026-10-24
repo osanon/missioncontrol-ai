@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, update, delete, func
-from backend.db import engine, clients, client_merges, DATA_TABLES, proposals, audit, followups, engine_for
+from backend.db import engine, clients, client_merges, DATA_TABLES, proposals, audit, followups, engine_for, ai_reviews
 from backend.main import app
 from backend.logic import decide, propose, issues, metrics, Conflict
 from backend.merges import duplicate_candidates, merge_preview, propose_merge, LINK_TABLES
@@ -38,6 +38,8 @@ def pair():
     yield
     with engine.begin() as c:
         c.execute(delete(client_merges).where(client_merges.c.source_id.in_([SOURCE, TARGET, THIRD])))
+        ids = [r.id for r in c.execute(select(proposals.c.id).where(proposals.c.record_id.in_([SOURCE, TARGET, THIRD])))]
+        c.execute(delete(ai_reviews).where(ai_reviews.c.proposal_id.in_(ids)))
         c.execute(delete(proposals).where(proposals.c.record_id.in_([SOURCE, TARGET, THIRD])))
         c.execute(delete(followups).where(followups.c.id.in_([SOURCE, TARGET])))
         for name in LINK_TABLES:
@@ -202,7 +204,7 @@ def test_agent_merge_tools_propose_only(pair):
 
 def test_live_model_loop_can_preview_and_propose_merge_without_applying(pair,monkeypatch):
     import json
-    from agent import runner
+    from agent import runner, llm
     monkeypatch.setenv('AGENT_MODE','live')
     monkeypatch.setenv('LLM_API_KEY','synthetic-test-key')
     monkeypatch.setenv('LLM_MODEL','mock-model')
@@ -220,7 +222,7 @@ def test_live_model_loop_can_preview_and_propose_merge_without_applying(pair,mon
             return {'choices':[{'message':{'content':None,'tool_calls':[{'id':f'call-{n}','type':'function','function':{'name':name,'arguments':json.dumps(args)}}]}}]}
     def fake_post(url,**kwargs):
         calls.append(kwargs['json']);return Response()
-    monkeypatch.setattr(runner.httpx,'post',fake_post)
+    monkeypatch.setattr(llm.httpx,'post',fake_post)
     result=runner.run(f'Propose merging {SOURCE} into {TARGET}. {EVIDENCE}','2026-07-01','2026-09-30')
     assert [s['tool'] for s in result['trace']]==['inspect_schema','preview_merge','propose_merge']
     assert all(s['status']=='completed' for s in result['trace'])
