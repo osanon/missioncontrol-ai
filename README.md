@@ -2,7 +2,7 @@
 
 A nonprofit data analyst with a React/TypeScript dashboard, FastAPI backend, PostgreSQL demo database, bounded SQL tools, and human-approved changes.
 
-**Default development path: private GitHub repository + GitHub Codespaces, entirely in your browser.** The application, database, Docker, and development tools run in the cloud workspace. You do not need to install development tools on your Our House work computer. Use synthetic data only.
+**Default development path: private GitHub repository + GitHub Codespaces, entirely in your browser.** The application, database, Docker, and development tools run in the cloud workspace. You do not need to install development tools on your own computer. Use synthetic data only.
 
 Start with **[the browser-only setup guide](docs/SETUP.md)**. It explains how to create your private repository, upload this ZIP inside a Codespace, and apply the included development-container configuration.
 

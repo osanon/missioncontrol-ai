@@ -1,6 +1,6 @@
 # Architecture and design decisions
 
-Development now runs in a private GitHub repository + GitHub Codespaces. The browser editor and private port-8080 preview are the work-computer interface. `.devcontainer/devcontainer.json` configures the cloud workspace; the existing Compose application runs inside its Docker environment. No connection to Our House production systems is required.
+Development now runs in a private GitHub repository + GitHub Codespaces. The browser editor and private port-8080 preview are all you need on your own computer. `.devcontainer/devcontainer.json` configures the cloud workspace; the existing Compose application runs inside its Docker environment. No connection to any real organization's systems is required.
 
 The portable deployment is React + TypeScript → Nginx → FastAPI → PostgreSQL. The agent runner invokes a fixed registry of tools. OpenAI-compatible inference is optional; deterministic guided routes use the same metric, quality, and proposal functions.
 
@@ -31,7 +31,7 @@ Approval checks are on the backend. Hiding a button is not the permission contro
 
 Nine analyst-visible tables: clients, programs, enrollments, services, employment, housing, assessments, followups, surveys. Control tables: proposed_actions, audit_records, agent_runs, ai_reviews. `backend/db.py` is authoritative. Schema changes are Alembic migrations in `database/migrations/versions/`, applied by the seed container (`database.bootstrap`) on every start; a test fails if the migrations and `backend/db.py` disagree.
 
-Dates use ISO `YYYY-MM-DD` strings in this first version to keep the SQLite test fallback aligned with PostgreSQL, while permitting intentionally invalid chronology. Migrate to typed dates and a separate raw/staging layer before importing external data. The data is intentionally fictional and is not a model of Our House's actual performance or schema.
+Dates use ISO `YYYY-MM-DD` strings in this first version to keep the SQLite test fallback aligned with PostgreSQL, while permitting intentionally invalid chronology. Migrate to typed dates and a separate raw/staging layer before importing external data. The data is intentionally fictional and is not a model of any real organization's performance or schema.
 
 ## Execution evidence and reporting
 

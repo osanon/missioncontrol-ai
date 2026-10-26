@@ -1,6 +1,6 @@
 # Browser-only cloud development setup
 
-Use a **private GitHub repository and GitHub Codespaces**. Your work computer needs a browser and internet connection; the development tools and PostgreSQL run in the cloud. Keep this project separate from Our House systems and use only the included fictional data. Vultr deployment comes later.
+Use a **private GitHub repository and GitHub Codespaces**. Your computer only needs a browser and internet connection; the development tools and PostgreSQL run in the cloud. Keep this project separate from any real organization's systems and use only the included fictional data. Vultr deployment comes later.
 
 ## 1. Choose the account and review usage
 
@@ -16,7 +16,7 @@ Review GitHub Settings → Billing and licensing and Settings → Codespaces. St
 4. Add a README so the repository has an initial commit.
 5. Create the repository.
 
-Do not upload a `.env` file, model API key, real client records, FileMaker exports, or Our House credentials.
+Do not upload a `.env` file, model API key, real client records, FileMaker exports, or any organization's credentials.
 
 ## 3. Open your first Codespace
 
@@ -75,7 +75,7 @@ docker compose ps -a
 docker compose logs --tail=100 db seed backend frontend
 ```
 
-If Docker is unavailable, wait for the environment startup or repeat the container rebuild from step 5. Do not install Docker on your work computer to resolve a Codespaces setup issue.
+If Docker is unavailable, wait for the environment startup or repeat the container rebuild from step 5. Do not install Docker on your own computer to resolve a Codespaces setup issue.
 
 ## 7. Open the private app preview
 
@@ -84,7 +84,7 @@ If Docker is unavailable, wait for the environment startup or repeat the contain
 3. Confirm **Port Visibility: Private**; do not change it to Public.
 4. Choose **Open in Browser** or click its forwarded address.
 
-The address will resemble `https://YOUR-CODESPACE-8080.app.github.dev`. Use that address rather than typing localhost:8080 in your work computer's browser. The service inside the Codespace uses HTTP; GitHub provides the HTTPS browser URL. Keep the forwarded-port protocol at HTTP for the supplied Nginx container.
+The address will resemble `https://YOUR-CODESPACE-8080.app.github.dev`. Use that address rather than typing localhost:8080 in your own computer's browser. The service inside the Codespace uses HTTP; GitHub provides the HTTPS browser URL. Keep the forwarded-port protocol at HTTP for the supplied Nginx container.
 
 Private is GitHub's default visibility, but `forwardPorts` by itself is not a visibility policy. Check the actual Ports panel. Only port 8080 is needed; PostgreSQL and FastAPI stay inside the application network.
 
