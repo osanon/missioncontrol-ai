@@ -6,6 +6,22 @@ A nonprofit data analyst with a React/TypeScript dashboard, FastAPI backend, Pos
 
 Start with **[the browser-only setup guide](docs/SETUP.md)**. It explains how to create your private repository, upload this ZIP inside a Codespace, and apply the included development-container configuration.
 
+## Vultr Agent Rush hackathon entry
+
+Entered in **Challenge 2: Powering the Future of Work**. MissionControl runs on a Vultr Cloud Compute instance, which acts as the central backend for the whole workflow: AI agents find data problems, propose fixes and review each other's proposals, people approve, reject or send them back, and every step is audited. Deployment guide: [docs/DEPLOY_VULTR.md](docs/DEPLOY_VULTR.md).
+
+### Project history: what was built before and during the event
+
+This project started before the hackathon. So judges can see exactly what is new, here is what existed before the online build began on 3 November 2026. The full commit history is kept intact so judges can verify it.
+
+**Before 3 November 2026** (commits from 6 October to 2 November):
+- The base application: dashboard, metrics, Data Health checks on fictional data, correction and merge proposals with human approval, the audit log, and a demo/live analyst agent with read-only SQL tools.
+- Phase 1 (16 October): personal reviewer identities, send back for reevaluation, proposal provenance, saved failed runs, database migrations.
+- Phase 2 (24 October): an independent AI reviewer agent and an approval queue that shows AI disagreements first.
+- Non-AI preparation (26 October onwards): query performance, browser sessions and a public demo mode, rate limits and an AI budget cap, a demo data reset command, review shortcuts and links, and Vultr deployment scaffolding.
+
+**During the event (3–8 November 2026):** listed here as it is built.
+
 ## Once the source is in your Codespace
 
 After `Codespaces: Rebuild Container` completes, run this in the Codespaces terminal:

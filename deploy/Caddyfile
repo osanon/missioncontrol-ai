@@ -1,0 +1,7 @@
+# Public HTTPS entry point for the Vultr deployment. Caddy obtains and renews the certificate automatically.
+# DOMAIN comes from .env (vultr-setup.sh defaults it to <server-ip>.sslip.io, which needs no DNS setup).
+{$DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy frontend:80
+}

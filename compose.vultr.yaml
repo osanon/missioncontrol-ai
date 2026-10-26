@@ -1,0 +1,25 @@
+# Vultr VM deployment: adds Caddy for public HTTPS on ports 80/443. Nginx (frontend) stays private behind it,
+# and PostgreSQL and FastAPI stay on the internal network. Start with:
+#   docker compose -f compose.yaml -f compose.vultr.yaml up -d --build
+# (scripts/vultr-setup.sh does this for you.)
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env (vultr-setup.sh does this)}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend: {condition: service_started}
+    restart: unless-stopped
+  backend:
+    environment:
+      COOKIE_SECURE: "true"
+volumes:
+  caddy_data:
+  caddy_config:
