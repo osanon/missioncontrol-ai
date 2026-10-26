@@ -59,16 +59,46 @@ CHECKS=[
  ('negative_units','services','SELECT id FROM services WHERE units < 0','Negative service units','Verify the service record before replacing its value.','medium')
 ]
 
-def issues():
+def fetch_records(c, table, ids):
+    """{id: record} for many rows of one table in a single query."""
+    t=DATA_TABLES[table]
+    ids=list(ids)
+    return {r['id']:dict(r) for r in c.execute(select(t).where(t.c.id.in_(ids))).mappings()} if ids else {}
+
+def contexts(c, items):
+    """Client and program names for many (table, record) pairs with two queries in total."""
+    client_ids={(r.get('id') if table=='clients' else r.get('client_id')) for table,r in items}-{None}
+    program_ids={r.get('program_id') for _,r in items}-{None}
+    people=fetch_records(c,'clients',client_ids)
+    names={k:v['name'] for k,v in fetch_records(c,'programs',program_ids).items()}
     out=[]
-    with engine.connect() as c:
-        statuses={x.issue_key.split('@',1)[0]:x.status for x in c.execute(select(proposals).order_by(proposals.c.created_at, proposals.c.id)).mappings() if '@' not in x.issue_key}
-    for kind,table,sql,title,reason,severity in CHECKS:
-        for x in query(sql):
-            key=f'{kind}:{x["id"]}'
-            record=query(f'SELECT * FROM {table} WHERE id=:id',{'id':x['id']})[0]
-            out.append(dict(key=key,kind=kind,table=table,record_id=x['id'],title=title,reason=reason,severity=severity,record=record,review_required=bool(record['review_required']),proposal_status=statuses.get(key),source_sql=sql,context=record_context(table,record)))
+    for table,r in items:
+        client_id=r.get('id') if table=='clients' else r.get('client_id')
+        person=people.get(client_id)
+        out.append({'client_id':client_id,'client_name':person['full_name'] if person else None,
+                    'client_identifier':person['external_id'] if person else None,'program':names.get(r.get('program_id'))})
     return out
+
+def issues(kinds=None):
+    """Current findings. Batched: one query per check, one per table for the records, two for names."""
+    with engine.connect() as c:
+        statuses={x.issue_key:x.status for x in c.execute(select(proposals.c.issue_key,proposals.c.status).order_by(proposals.c.created_at,proposals.c.id)) if '@' not in x.issue_key}
+    found=[]
+    with reader.connect() as c:
+        for kind,table,sql,title,reason,severity in CHECKS:
+            if kinds and kind not in kinds:continue
+            ids=[x['id'] for x in c.execute(text(sql)).mappings()]
+            records=fetch_records(c,table,ids)
+            found+=[(kind,table,sql,title,reason,severity,records[i]) for i in ids if i in records]
+        names=contexts(c,[(f[1],f[6]) for f in found])
+    return [dict(key=f'{kind}:{record["id"]}',kind=kind,table=table,record_id=record['id'],title=title,reason=reason,severity=severity,record=record,
+                 review_required=bool(record['review_required']),proposal_status=statuses.get(f'{kind}:{record["id"]}'),source_sql=sql,context=context)
+            for (kind,table,sql,title,reason,severity,record),context in zip(found,names)]
+
+def find_issue(issue_key):
+    """Look up one finding by key, running only that finding's check."""
+    kind=issue_key.split(':',1)[0]
+    return next((x for x in issues({kind}) if x['key']==issue_key),None) if any(kind==k[0] for k in CHECKS) else None
 
 class Conflict(ValueError): pass
 
@@ -92,15 +122,6 @@ def provenance(actor, actor_kind, run_id, model):
     return {'created_by': actor, 'created_by_kind': actor_kind, 'run_id': run_id, 'model': model}
 
 
-def record_context(table, record):
-    client_id = record.get('id') if table == 'clients' else record.get('client_id')
-    client = query('SELECT external_id, full_name FROM clients WHERE id=:id', {'id': client_id}) if client_id else []
-    program = query('SELECT name FROM programs WHERE id=:id', {'id': record.get('program_id')}) if record.get('program_id') else []
-    return {'client_id': client_id, 'client_name': client[0]['full_name'] if client else None,
-            'client_identifier': client[0]['external_id'] if client else None,
-            'program': program[0]['name'] if program else None}
-
-
 def latest_reviews(c, proposal_ids=None):
     """Latest AI review per proposal, in one query."""
     stmt = select(ai_reviews).order_by(ai_reviews.c.created_at, ai_reviews.c.id)
@@ -109,15 +130,22 @@ def latest_reviews(c, proposal_ids=None):
     return {r['proposal_id']: dict(r) for r in c.execute(stmt).mappings()}
 
 
-def proposal_view(item, review=None):
+def proposal_views(c, items, reviews):
+    """Build review views for many proposals: current records batched per table, names batched once."""
+    by_table = {}
+    for item in items:
+        by_table.setdefault(item['table_name'], set()).add(item['record_id'])
+    current = {table: fetch_records(c, table, ids) for table, ids in by_table.items()}
+    records = [current[item['table_name']].get(item['record_id'], {}) for item in items]
+    names = contexts(c, [(item['table_name'], record) for item, record in zip(items, records)])
+    return [proposal_view(item, reviews.get(item['id']), record, context) for item, record, context in zip(items, records, names)]
+
+
+def proposal_view(item, review, record, context):
     result = dict(item)
     result['ai_review'] = review
-    t = DATA_TABLES[result['table_name']]
-    with engine.connect() as c:
-        current = c.execute(select(t).where(t.c.id == result['record_id'])).mappings().first()
-    record = dict(current) if current else {}
     result['current_record'] = record
-    result['context'] = record_context(result['table_name'], record)
+    result['context'] = context
     result['snapshot_complete'] = 'id' in result['before']
     result['proposal_type'] = 'merge' if result['after'].get('action') == 'merge_clients' else 'follow_up' if set(result['after']) == {'review_required'} else 'correction'
     result['base_issue_key'] = result['issue_key'].split('@', 1)[0]
@@ -126,9 +154,8 @@ def proposal_view(item, review=None):
 
 def list_proposals():
     with engine.connect() as c:
-        rows = list(c.execute(select(proposals).order_by(proposals.c.created_at.desc())).mappings())
-        reviews = latest_reviews(c)
-    return [proposal_view(row, reviews.get(row['id'])) for row in rows]
+        rows = [dict(r) for r in c.execute(select(proposals).order_by(proposals.c.created_at.desc())).mappings()]
+        return proposal_views(c, rows, latest_reviews(c))
 
 
 def get_proposal_view(proposal_id):
@@ -136,8 +163,7 @@ def get_proposal_view(proposal_id):
         row = c.execute(select(proposals).where(proposals.c.id == proposal_id)).mappings().first()
         if not row:
             raise ValueError('Proposal not found.')
-        review = latest_reviews(c, [proposal_id]).get(proposal_id)
-    return proposal_view(row, review)
+        return proposal_views(c, [dict(row)], latest_reviews(c, [proposal_id]))[0]
 
 
 def correction_patch(issue, resolution, value, evidence):
@@ -195,7 +221,7 @@ def propose(issue_key, actor='analyst', resolution=None, value='', evidence='', 
             actor_kind='human', run_id=None, model=None):
     if '@' in issue_key:
         raise ValueError('Use the original finding key, not a historical proposal key.')
-    issue = next((x for x in issues() if x['key'] == issue_key), None)
+    issue = find_issue(issue_key)
     if not issue:
         raise ValueError('Issue does not exist or no longer applies. Refresh Data Health.')
     resolution = resolution or ('clear_wage' if issue['kind'] == 'wage_outlier' else 'follow_up')
