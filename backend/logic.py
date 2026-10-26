@@ -82,7 +82,7 @@ def record_context(table, record):
             'program': program[0]['name'] if program else None}
 
 
-def proposal_view(item):
+def proposal_view(item,feedback=()):
     result = dict(item)
     t = DATA_TABLES[result['table_name']]
     with engine.connect() as c:
@@ -93,13 +93,20 @@ def proposal_view(item):
     result['snapshot_complete'] = 'id' in result['before']
     result['proposal_type'] = 'merge' if result['after'].get('action') == 'merge_clients' else 'follow_up' if set(result['after']) == {'review_required'} else 'correction'
     result['base_issue_key'] = result['issue_key'].split('@', 1)[0]
+    result['revision_feedback']=[e['feedback'] for e in feedback]
+    result['revision_requested']=result['status']=='pending' and bool(feedback)
     return result
 
 
 def list_proposals():
     with engine.connect() as c:
         rows = list(c.execute(select(proposals).order_by(proposals.c.created_at.desc())).mappings())
-    return [proposal_view(row) for row in rows]
+    from backend.db import audit
+    feedback={}
+    with engine.connect() as c:
+        for e in c.execute(select(audit.c.details).where(audit.c.event=='ai_revision_requested').order_by(audit.c.occurred_at)).scalars():
+            feedback.setdefault(e['proposal_id'],[]).append(e)
+    return [proposal_view(row,feedback.get(row['id'],[])) for row in rows]
 
 
 def correction_patch(issue, resolution, value, evidence):
@@ -212,6 +219,11 @@ def decide(proposal_id, decision, actor):
         found = c.execute(select(proposals).where(proposals.c.id == proposal_id)).mappings().first()
         if not found:
             raise ValueError('Proposal not found.')
+        if decision == 'approve':
+            from backend.db import audit
+            events=c.execute(select(audit.c.details).where(audit.c.event=='ai_revision_requested')).scalars()
+            if any(e.get('proposal_id')==proposal_id for e in events):
+                raise Conflict('Revision requested: replace this proposal before approval, or reject it.')
         if found['after'].get('action') == 'merge_clients':
             from backend.merges import decide_merge
             return decide_merge(c, found, decision, actor)

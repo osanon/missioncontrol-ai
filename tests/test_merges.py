@@ -236,7 +236,7 @@ def test_postgres_merge_grants_and_identity_protection(pair,monkeypatch):
     try:
         p=make_merge();decide(p['id'],'approve','tester')
         for name in LINK_TABLES:assert owner(name)==TARGET
-        for stmt in (update(clients).where(clients.c.id==TARGET).values(email='forbidden@example.invalid'),delete(clients).where(clients.c.id==SOURCE)):
+        for stmt in (update(clients).where(clients.c.id==TARGET).values(external_id='forbidden-identifier'),delete(clients).where(clients.c.id==SOURCE)):
             with pytest.raises(DBAPIError):
                 with e.begin() as c:c.execute(stmt)
     finally:e.dispose()

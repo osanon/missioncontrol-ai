@@ -139,7 +139,7 @@ def test_agent_can_propose_but_has_no_approval_tool(enrollment):
     assert not any('approve' in t['function']['name'] for t in TOOLS)
 
 @pytest.mark.skipif(not os.getenv('MC_TEST_APP_DATABASE_URL'),reason='PostgreSQL app-role test')
-def test_postgres_app_role_can_apply_correction_but_not_change_client_identity(enrollment,monkeypatch):
+def test_postgres_app_role_can_apply_correction_but_not_change_client_identifier(enrollment,monkeypatch):
     from backend import logic
     from sqlalchemy.exc import DBAPIError
     app_engine=engine_for(os.environ['MC_TEST_APP_DATABASE_URL'])
@@ -150,7 +150,7 @@ def test_postgres_app_role_can_apply_correction_but_not_change_client_identity(e
         decide(p['id'],'approve','tester')
         assert row()['end_date']=='2026-09-20'
         with pytest.raises(DBAPIError):
-            with app_engine.begin() as c:c.execute(text("UPDATE clients SET full_name='forbidden' WHERE id=1"))
+            with app_engine.begin() as c:c.execute(text("UPDATE clients SET external_id='forbidden' WHERE id=1"))
     finally:app_engine.dispose()
 
 @pytest.mark.parametrize('table_name,kind,resolution,field,old_value,new_value',[

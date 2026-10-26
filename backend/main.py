@@ -104,3 +104,32 @@ def preview_merge(source_id:int=Query(gt=0),target_id:int=Query(gt=0),replaces_i
 def create_merge(body:MergeProposal):
     from backend.merges import propose_merge
     return propose_merge(**body.model_dump())
+
+class AIReview(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    issue_key:str=Field(min_length=3,max_length=100)
+    feedback:str=Field(default='',max_length=2000)
+    proposal_id:str|None=Field(default=None,max_length=100)
+@app.post('/ai-review',dependencies=[Depends(auth),Depends(reviewer)])
+def review_finding(body:AIReview):
+    from backend.ai_review import review
+    return review(**body.model_dump())
+@app.get('/clients',dependencies=[Depends(auth)])
+def client_directory(q:str=Query('',max_length=200),page:int=Query(0,ge=0),archived:bool=False):
+    from backend.client_directory import directory
+    return directory(q,page,archived)
+@app.get('/clients/{client_id}',dependencies=[Depends(auth)])
+def client_profile(client_id:int):
+    from backend.client_directory import profile
+    return profile(client_id)
+class ClientEdit(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    table:Literal['clients','enrollments','employment','services','housing']
+    record_id:int=Field(gt=0)
+    version:str=Field(pattern=r'^[a-f0-9]{64}$')
+    patch:dict=Field(min_length=1,max_length=5)
+    note:str=Field(min_length=10,max_length=2000)
+@app.post('/clients/{client_id}/edit',dependencies=[Depends(auth)])
+def client_edit(client_id:int,body:ClientEdit,actor:str=Depends(reviewer)):
+    from backend.client_directory import edit
+    return edit(client_id,body.table,body.record_id,body.version,body.patch,body.note,actor)

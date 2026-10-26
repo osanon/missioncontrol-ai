@@ -19,4 +19,9 @@ if __name__=='__main__':
         c.execute(text('GRANT INSERT ON TABLE client_merges TO mc_app'))
         for table in ('enrollments','services','employment','housing','assessments'):
             c.execute(text(f'GRANT UPDATE (client_id) ON TABLE {table} TO mc_app'))
+        c.execute(text('GRANT UPDATE (full_name, birth_date, email) ON TABLE clients TO mc_app'))
+        c.execute(text('GRANT UPDATE (start_date) ON TABLE enrollments TO mc_app'))
+        c.execute(text('GRANT UPDATE (start_date, end_date) ON TABLE employment TO mc_app'))
+        c.execute(text('GRANT UPDATE (service_date) ON TABLE services TO mc_app'))
+        c.execute(text('GRANT UPDATE (entry_date, exit_date, destination) ON TABLE housing TO mc_app'))
     print('Fictional data initialized; role grants applied.')
