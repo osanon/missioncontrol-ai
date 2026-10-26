@@ -4,6 +4,7 @@ from backend.db import schema
 from backend.logic import metrics,cohorts,issues,propose,period,now
 from agent.sql_guard import safe_query
 from agent.llm import llm_config, tool_loop, Tracer, Usage, failure_message, save_run
+from backend.limits import check_ai_budget
 
 TOOL_SPEC=[
  ('inspect_schema','Inspect available fictional database tables and columns.',{}),
@@ -91,6 +92,7 @@ def run(question,start,end,previous=None):
     mode=os.getenv('AGENT_MODE','demo')
     if mode not in ('demo','live'):raise ValueError('AGENT_MODE must be demo or live.')
     cfg=llm_config() if mode=='live' else None
+    if cfg:check_ai_budget()
     model=cfg.model if cfg else None
     run_id,created_at,usage=str(uuid.uuid4()),now(),Usage()
     # Proposals created by tools in this run are attributed to the agent, the run and the model.

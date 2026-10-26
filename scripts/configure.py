@@ -12,7 +12,7 @@ import sys
 root = Path(__file__).resolve().parents[1]
 path = root / '.env'
 NAME = re.compile(r'^[a-z0-9][a-z0-9_.-]{0,39}$')
-RESERVED = {'analyst', 'system'}
+RESERVED = {'analyst', 'system', 'demo-reviewer'}
 
 
 def valid_name(name):
@@ -26,7 +26,7 @@ def create(reviewer):
     if path.exists():
         raise SystemExit('.env already exists; preserving your configuration. '
                          'Use --add-reviewer NAME to add a reviewer, or edit .env directly.')
-    keys = ('POSTGRES_PASSWORD', 'READER_PASSWORD', 'APP_DB_PASSWORD', 'APP_TOKEN')
+    keys = ('POSTGRES_PASSWORD', 'READER_PASSWORD', 'APP_DB_PASSWORD', 'APP_TOKEN', 'SESSION_SECRET')
     values = {k: secrets.token_hex(24) for k in keys}
     values['REVIEWERS'] = f'{reviewer}:{secrets.token_hex(24)}'
     path.write_text('\n'.join(f'{k}={v}' for k, v in values.items()) +

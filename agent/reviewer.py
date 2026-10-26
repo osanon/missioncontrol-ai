@@ -16,6 +16,7 @@ from backend.logic import get_proposal_view, query, now, Conflict
 from backend.db import ai_reviews
 from agent.sql_guard import safe_query
 from agent.llm import llm_config, tool_loop, Tracer, Usage, ProviderError, failure_message, save_run
+from backend.limits import check_ai_budget
 
 ACTOR = 'agent:reviewer'
 VERDICTS = ('agree', 'disagree', 'uncertain')
@@ -191,6 +192,8 @@ def review_proposal(proposal_id):
     if mode not in ('demo', 'live'):
         raise ValueError('AGENT_MODE must be demo or live.')
     cfg = llm_config('LLM_REVIEW_MODEL') if mode == 'live' else None
+    if cfg:
+        check_ai_budget()
     run_id, created_at, usage, holder = str(uuid.uuid4()), now(), Usage(), {}
     status, error, review = 'completed', None, None
     if mode == 'demo':

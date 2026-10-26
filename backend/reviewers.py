@@ -12,7 +12,7 @@ import secrets
 
 NAME = re.compile(r'^[a-z0-9][a-z0-9_.-]{0,39}$')
 # Names that identify the analyst workspace or AI agents; a human reviewer must never share them.
-RESERVED = {'analyst', 'system'}
+RESERVED = {'analyst', 'system', 'demo-reviewer'}
 MIN_TOKEN = 24
 
 

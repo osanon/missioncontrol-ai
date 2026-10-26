@@ -43,6 +43,13 @@ services:
       # Optional separate model for the independent AI reviewer; defaults to LLM_MODEL.
       LLM_REVIEW_MODEL: ${LLM_REVIEW_MODEL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      # Public demo for judges: one-click analyst/reviewer sessions on fictional data. Off unless set.
+      PUBLIC_DEMO: ${PUBLIC_DEMO:-false}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      AI_DAILY_TOKEN_BUDGET: ${AI_DAILY_TOKEN_BUDGET:-0}
+      AI_RATE_PER_HOUR: ${AI_RATE_PER_HOUR:-30}
+      LOGIN_RATE_PER_MINUTE: ${LOGIN_RATE_PER_MINUTE:-10}
     depends_on:
       seed: {condition: service_completed_successfully}
     healthcheck:

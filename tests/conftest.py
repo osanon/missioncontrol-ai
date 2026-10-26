@@ -19,3 +19,10 @@ def dataset():
     seed()
     yield
     engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    from backend.limits import limiter
+    limiter.reset()
+    yield
