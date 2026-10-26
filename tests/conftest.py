@@ -6,13 +6,23 @@ os.environ['DATABASE_URL']=os.getenv('MC_TEST_DATABASE_URL','sqlite:///'+str(Pat
 os.environ['READ_DATABASE_URL']=os.getenv('MC_TEST_READ_DATABASE_URL',os.environ['DATABASE_URL'])
 os.environ['APP_TOKEN']='test-analyst-token-000000000000000000'
 os.environ['REVIEW_TOKEN']='test-review-token-0000000000000000000'
+os.environ['REVIEWERS']='alice:test-alice-token-00000000000000000000,bob:test-bob-token-0000000000000000000000'
 os.environ['AGENT_MODE']='demo'
 import pytest
 from backend.db import engine,metadata
 from database.seed import seed
+from database.migrate import upgrade
 
 @pytest.fixture(scope='session',autouse=True)
 def dataset():
+    upgrade()
     seed()
     yield
     engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    from backend.limits import limiter
+    limiter.reset()
+    yield

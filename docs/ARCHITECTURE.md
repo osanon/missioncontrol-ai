@@ -1,6 +1,6 @@
 # Architecture and design decisions
 
-Development now runs in a private GitHub repository + GitHub Codespaces. The browser editor and private port-8080 preview are the work-computer interface. `.devcontainer/devcontainer.json` configures the cloud workspace; the existing Compose application runs inside its Docker environment. No connection to Our House production systems is required.
+Development now runs in a private GitHub repository + GitHub Codespaces. The browser editor and private port-8080 preview are all you need on your own computer. `.devcontainer/devcontainer.json` configures the cloud workspace; the existing Compose application runs inside its Docker environment. No connection to any real organization's systems is required.
 
 The portable deployment is React + TypeScript → Nginx → FastAPI → PostgreSQL. The agent runner invokes a fixed registry of tools. OpenAI-compatible inference is optional; deterministic guided routes use the same metric, quality, and proposal functions.
 
@@ -11,7 +11,8 @@ The portable deployment is React + TypeScript → Nginx → FastAPI → PostgreS
 | Read dashboard/API | Analyst token | Read metrics, issues, source evidence |
 | Agent SQL | Separate `mc_reader` DB login | SELECT only on nine demo tables; read-only transaction; 3-second statement timeout; 200-row output cap |
 | Propose change | Trusted tool or analyst API | Pending proposed action with exact before/after fields |
-| Decide proposal | Analyst + reviewer tokens | Controlled change in one transaction with the audit event |
+| AI review of a proposal | Analyst token; reviewer agent with read-only tools | Advisory verdict saved in `ai_reviews`; no data or proposal status changes |
+| Decide proposal | Analyst token + personal reviewer token | Approve, reject or send back; decision recorded under the reviewer's name in one transaction with the audit event |
 | Initialize schema and seed | Separate owner credential in one-shot container | Creates tables, inserts fictional data, grants roles |
 
 The model never receives the database URL, reviewer token, arbitrary write tool, shell, or Python executor. SQL is parsed with SQLGlot; only one SELECT query, approved tables, grammar nodes, and approved functions are accepted. The database role provides a second boundary. Quality scans and fixed KPI queries are trusted application code.
@@ -28,22 +29,34 @@ Approval checks are on the backend. Hiding a button is not the permission contro
 
 ## Data model
 
-Nine analyst-visible tables: clients, programs, enrollments, services, employment, housing, assessments, followups, surveys. Three control tables: proposed_actions, audit_records, agent_runs. `backend/db.py` is authoritative; `database/schema.sql` is a generated PostgreSQL reference.
+Nine analyst-visible tables: clients, programs, enrollments, services, employment, housing, assessments, followups, surveys. Control tables: proposed_actions, audit_records, agent_runs, ai_reviews. `backend/db.py` is authoritative. Schema changes are Alembic migrations in `database/migrations/versions/`, applied by the seed container (`database.bootstrap`) on every start; a test fails if the migrations and `backend/db.py` disagree.
 
-Dates use ISO `YYYY-MM-DD` strings in this first version to keep the SQLite test fallback aligned with PostgreSQL, while permitting intentionally invalid chronology. Migrate to typed dates and a separate raw/staging layer before importing external data. The data is intentionally fictional and is not a model of Our House's actual performance or schema.
+Dates use ISO `YYYY-MM-DD` strings in this first version to keep the SQLite test fallback aligned with PostgreSQL, while permitting intentionally invalid chronology. Migrate to typed dates and a separate raw/staging layer before importing external data. The data is intentionally fictional and is not a model of any real organization's performance or schema.
 
 ## Execution evidence and reporting
 
 Each completed investigation stores its question, answer, mode, tool arguments, outputs, status, and durations. The report endpoint exports these as Markdown. A live agent's narrative may still be wrong; the evidence trail is the review surface. SQL result truncation is explicit. The previous completed question and answer are passed to the next live request; full multi-turn tool context and saved-chat browsing are planned.
 
+## Proposal lifecycle and provenance
+
+Every proposal records who created it (`created_by`, and `created_by_kind` = `human` or `agent`), and for agent proposals the investigation (`run_id`) and `model`. A human reviewer decides:
+
+- **Approve** → `applied`; the change is made.
+- **Reject** → `rejected`; nothing changes.
+- **Send back** → `reevaluation_requested` with a required note; nothing changes. The author (today the analyst, later the proposing agent) submits a revision with `replaces_id`; the new proposal records `supersedes_id` and the audit log records `proposal_revised`.
+
+An author can never decide their own proposal.
+
+**AI review.** `POST /proposals/{id}/ai-review` runs the independent reviewer (`agent/reviewer.py`) on a pending proposal. It sees the proposal, the current record and the database (read-only SQL), not the proposing agent's conversation, and its only output tool is `submit_review` (verdict, confidence, summary, concerns), stored in `ai_reviews`. It cannot propose, decide or change data. Demo mode uses deterministic checks (for example services recorded after a proposed exit date); live mode uses `LLM_REVIEW_MODEL` or `LLM_MODEL`. Each review is an `agent_runs` row (`kind = reviewer`) with its trace and token usage. Human decisions record the AI verdict at that moment (`ai_verdict` in the audit event) so agreement and overrides can be measured. Investigations are always stored, including failed ones (`agent_runs.status = failed`, with the partial trace), so a proposal created before a provider failure still links to its evidence.
+
 ## Current scope boundaries
 
 - One fictional PostgreSQL source. No FileMaker, HMIS, Qualtrics, or external source connector yet.
-- Demo authentication uses role tokens; no SSO or individual user attribution.
+- Reviewers use personal tokens from `.env` (`REVIEWERS`), resolved in `backend/reviewers.py`; Google/Microsoft sign-in is planned and only needs to replace that module. The analyst token is still shared.
 - Tools run in the backend with DB-level read isolation. No arbitrary code execution, Microsandbox, MCP transport, or Kubernetes.
 - No automatic record merges, inferred dates, or invented demographics.
-- One proposal per issue key; no edit/revision, bulk approval, or full source-record correction form yet.
-- No streaming, background queue, retry scheduler, migration framework, or production retention policy.
+- One active proposal per issue key; earlier revisions stay in history linked by `supersedes_id`. No bulk approval yet.
+- No streaming, background queue, retry scheduler, or production retention policy.
 
 ## Microsandbox / MCP next milestone
 

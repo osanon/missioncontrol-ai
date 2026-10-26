@@ -15,4 +15,4 @@ if [[ ! -f .env ]]; then
 fi
 docker compose up --build -d
 docker compose ps -a
-printf '%s\n' 'The stack has been started. Check backend health in the status output.' 'In Codespaces, open Ports → 8080 → Open in Browser; keep visibility Private.' 'Open the workspace .env file for APP_TOKEN; use REVIEW_TOKEN only for approval decisions.' 'Diagnostics: docker compose logs --tail=100 db seed backend frontend'
+printf '%s\n' 'The stack has been started. Check backend health in the status output.' 'In Codespaces, open Ports → 8080 → Open in Browser; keep visibility Private.' 'Open the workspace .env file for APP_TOKEN; use your personal token from REVIEWERS only for review decisions.' 'Diagnostics: docker compose logs --tail=100 db seed backend frontend'

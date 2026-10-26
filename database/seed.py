@@ -1,4 +1,4 @@
-"""Deterministic, fictional data; no real client information. Run once on an empty DB."""
+"""Deterministic, fictional data; no real client information. Run on a migrated DB (database.migrate)."""
 import random
 from datetime import date, timedelta
 from sqlalchemy import select, func
@@ -7,7 +7,6 @@ from backend.db import *
 ANOMALIES = {'likely_duplicate_clients':12, 'enrollment_end_before_start':10, 'missing_exit_dates':10, 'invalid_wages':8, 'negative_service_units':6}
 
 def seed(target=engine):
-    metadata.create_all(target)
     r=random.Random(42)
     with target.begin() as c:
         if c.scalar(select(func.count()).select_from(clients)): return False
@@ -49,4 +48,6 @@ def seed(target=engine):
     return True
 
 if __name__=='__main__':
+    from database.migrate import upgrade
+    upgrade()
     print('Seeded fictional dataset.' if seed() else 'Existing dataset preserved.')
