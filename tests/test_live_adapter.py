@@ -21,5 +21,7 @@ def test_live_tool_loop_with_mock_provider(monkeypatch):
     assert result['mode']=='live'
     assert result['trace'][0]['result']['clients_served']==581
     assert '581' in requests[1]['messages'][-1]['content']
+    system=requests[0]['messages'][0]['content']
+    assert 'Selected inclusive period: 2026-07-01 to 2026-09-30.' in system and '$' not in system
     names=[t['function']['name'] for t in requests[0]['tools']]
     assert 'approve' not in names and 'propose_correction' in names

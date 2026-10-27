@@ -52,7 +52,7 @@ The generated `.env` is private to the cloud workspace and ignored by Git. `LLM_
 | `.devcontainer/` | GitHub Codespaces environment and port forwarding |
 | `frontend/` | React, TypeScript, responsive dashboard, Vite |
 | `backend/` | FastAPI routes, data model, controlled business logic |
-| `agent/` | Tools, demo/live runner, SQL policy |
+| `agent/` | Tools, demo/live runner, SQL policy; AI instructions in `agent/prompts/` |
 | `database/` | Seed data, role grants, reference SQL schema |
 | `docker/` | Images, Nginx, PostgreSQL setup |
 | `scripts/` | Credential setup and cloud startup |

@@ -5,11 +5,21 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
+from string import Template
 import httpx
 from backend.db import engine, runs
 from backend.logic import log
 
 logger = logging.getLogger(__name__)
+
+
+PROMPTS = Path(__file__).resolve().parent / 'prompts'
+
+
+def load_prompt(name, **values):
+    """Read agent/prompts/<name>.md, filling $placeholders such as $start. A missing value raises KeyError."""
+    return Template((PROMPTS / f'{name}.md').read_text(encoding='utf-8')).substitute(values).strip()
 
 
 class ProviderError(ValueError):
