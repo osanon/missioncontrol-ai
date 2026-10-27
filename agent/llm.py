@@ -87,17 +87,56 @@ class Tracer:
         return data
 
 
-def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6, max_steps=12, max_tokens=2200):
-    """Chat-completions tool loop. Returns the final text, or None if `done()` became true or the limits were hit."""
-    for _ in range(max_turns):
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+RETRY_DELAYS = (1, 3)  # seconds before the second and third attempt
+REQUEST_TIMEOUT = 60
+RUN_TIME_LIMIT = 150  # seconds for all model requests in one run, retries included
+sleep = time.sleep  # replaced in tests
+
+
+def retry_delay(exc, attempt):
+    """Seconds to wait before retrying `exc`, or None when it should not be retried."""
+    if attempt >= len(RETRY_DELAYS):
+        return None
+    if isinstance(exc, httpx.HTTPStatusError):
+        if exc.response.status_code not in RETRY_STATUSES:
+            return None
+        # Respect the provider's Retry-After (in seconds) when it asks for a short wait.
+        try:
+            return min(max(float(exc.response.headers.get('retry-after', '')), RETRY_DELAYS[attempt]), 10)
+        except ValueError:
+            return RETRY_DELAYS[attempt]
+    # Connection failures and timeouts are usually temporary.
+    return RETRY_DELAYS[attempt] if isinstance(exc, httpx.TransportError) else None
+
+
+def complete(cfg, body, deadline):
+    """One chat-completions request, retried on temporary provider failures within the run's time limit."""
+    attempt = 0
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 1:
+            raise ProviderError('The AI provider took too long to respond. Try again or narrow the question.')
         try:
             response = httpx.post(cfg.base + '/chat/completions', headers={'Authorization': 'Bearer ' + cfg.key},
-                                  json={'model': cfg.model, 'messages': messages, 'tools': tools, 'parallel_tool_calls': False,
-                                        'max_completion_tokens': max_tokens}, timeout=60)
+                                  json=body, timeout=min(REQUEST_TIMEOUT, remaining))
             response.raise_for_status()
-            data = response.json()
+            return response.json()
         except (httpx.HTTPError, ValueError) as exc:
-            raise ProviderError('Inference request failed. Check the server-side provider URL, model access, key, and quota.') from exc
+            delay = retry_delay(exc, attempt)
+            if delay is None or time.monotonic() + delay + 1 >= deadline:
+                raise ProviderError('Inference request failed. Check the server-side provider URL, model access, key, and quota.') from exc
+            logger.warning('Inference request failed (%s); retrying in %ss', type(exc).__name__, delay)
+            sleep(delay)
+            attempt += 1
+
+
+def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6, max_steps=12, max_tokens=2200):
+    """Chat-completions tool loop. Returns the final text, or None if `done()` became true or the limits were hit."""
+    deadline = time.monotonic() + RUN_TIME_LIMIT
+    for _ in range(max_turns):
+        data = complete(cfg, {'model': cfg.model, 'messages': messages, 'tools': tools, 'parallel_tool_calls': False,
+                              'max_completion_tokens': max_tokens}, deadline)
         usage.add(data)
         msg, calls = parse_message(data)
         if not calls:
