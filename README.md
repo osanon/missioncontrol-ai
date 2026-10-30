@@ -19,6 +19,7 @@ This project started before the hackathon. So judges can see exactly what is new
 - Phase 1 (16 October): personal reviewer identities, send back for reevaluation, proposal provenance, saved failed runs, database migrations.
 - Phase 2 (24 October): an independent AI reviewer agent and an approval queue that shows AI disagreements first.
 - Non-AI preparation (26 October onwards): query performance, browser sessions and a public demo mode, rate limits and an AI budget cap, a demo data reset command, review shortcuts and links, and Vultr deployment scaffolding.
+- Development tooling and AI reliability (27 October): automated GitHub checks on every pull request (linting, backend tests on SQLite and PostgreSQL, frontend build), retries and a 150-second time limit for AI provider requests, and the AI agents' instructions moved into readable files (`agent/prompts/`). Missed fixes from 26 October (a migration repair for older databases and a backend image permission fix) were also merged on 30 October.
 
 **During the event (3–8 November 2026):** listed here as it is built.
 
@@ -61,7 +62,7 @@ The generated `.env` is private to the cloud workspace and ignored by Git. `LLM_
 
 ## Status
 
-Phases 1 and 2 (reviewer identities, reevaluation, provenance, reliable live runs, migrations, and the AI reviewer) are checked with 106 backend tests passing on PostgreSQL 16 using the real `mc_reader`/`mc_app` roles (102 on SQLite, where the 4 PostgreSQL role tests are skipped), a successful frontend build, browser walkthroughs of the review flow, and upgrades of v0.1 and phase 1 PostgreSQL databases. See the [phase 1](docs/PHASE1_UPDATE.md) and [phase 2](docs/PHASE2_UPDATE.md) updates. The new cloud scripts/configuration have been checked locally, but a real Codespace and full Docker/PostgreSQL startup have not yet been run. See [validation](docs/VALIDATION.md).
+Phases 1 and 2 (reviewer identities, reevaluation, provenance, reliable live runs, migrations, and the AI reviewer) are checked with 134 backend tests passing on PostgreSQL 16 using the real `mc_reader`/`mc_app` roles (130 on SQLite, where the 4 PostgreSQL role tests are skipped), a successful frontend build, browser walkthroughs of the review flow, and upgrades of v0.1 and phase 1 PostgreSQL databases. See the [phase 1](docs/PHASE1_UPDATE.md) and [phase 2](docs/PHASE2_UPDATE.md) updates. The app has since been started in a real GitHub Codespace with the full Docker/PostgreSQL stack, and its data edited through Adminer. See [validation](docs/VALIDATION.md).
 
 Vultr hosting, Microsandbox, and MCP remain later milestones. Codespaces is the development workspace, not the final hackathon hosting platform. No repository, paid Codespace, or cloud server has been created by this ZIP update.
 
