@@ -81,7 +81,7 @@ Recreate the backend so it receives the new environment:
 docker compose up -d --force-recreate backend
 ```
 
-The key stays on the server. The live agent can inspect the schema, issue safe SQL reads, calculate metrics, compare periods/cohorts, scan quality, and propose corrections when asked. It cannot approve a proposal. Each run is capped at six model requests and twelve tool executions. The UI displays the completed trace, not a live stream.
+The key stays on the server. The live agent can inspect the schema, issue safe SQL reads, calculate metrics, compare periods/cohorts, scan quality, and propose corrections when asked. It cannot approve a proposal. Each run is capped at six model requests, twelve tool executions and 150 seconds of waiting on the provider. Temporary provider failures (rate limits, server errors, dropped connections) are retried up to twice. The UI displays the completed trace, not a live stream.
 
 To return to the no-key demo, set `AGENT_MODE=demo` and recreate the backend. Demo mode uses predefined routes selected from the question; it does not claim open-ended language understanding. In demo mode the date picker controls the reporting period; dates mentioned only in text are not parsed.
 

@@ -155,6 +155,7 @@ class Provider:
         monkeypatch.setenv('LLM_API_KEY', 'fake-test-key')
         monkeypatch.setenv('LLM_MODEL', 'test-model')
         monkeypatch.setattr(llm.httpx, 'post', self.post)
+        monkeypatch.setattr(llm, 'sleep', lambda seconds: None)
 
     def post(self, url, **kwargs):
         self.requests.append(kwargs['json'])
@@ -199,7 +200,7 @@ def test_human_proposal_records_analyst(job):
 
 def test_failed_live_run_is_saved_with_partial_trace(monkeypatch, job):
     Provider(monkeypatch, tool_call('propose_correction', {'issue_key': job, 'resolution': 'follow_up', 'value': '', 'evidence': ''}),
-             httpx.ConnectError('provider down'))
+             *[httpx.ConnectError('provider down')] * 3)
     with TestClient(app) as client:
         result = client.post('/ask', headers=HEADERS, json={'question': 'Flag the implausible wage.'}).json()
         assert result['status'] == 'failed' and 'Inference request failed' in result['error']

@@ -1,0 +1,13 @@
+# Linting: `ruff check .` (run in CI). Only rules that catch real mistakes (syntax errors,
+# undefined or unused names); the compact one-line style used in this codebase is allowed.
+target-version = "py312"
+extend-exclude = ["frontend"]
+
+[lint]
+select = ["E9", "F"]
+
+[lint.per-file-ignores]
+# pytest fixtures are imported and then named as test arguments, which F811 misreads as a redefinition.
+"tests/*" = ["F811"]
+# The seed script uses every table from backend.db.
+"database/seed.py" = ["F403", "F405"]

@@ -5,7 +5,7 @@ from fastapi import FastAPI,Depends,Header,HTTPException,Query,Request,Response
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel,Field,ConfigDict
 from sqlalchemy import text,select
-from backend.db import engine,reader,schema,proposals,audit,runs
+from backend.db import engine,reader,schema,audit,runs
 from backend.logic import metrics,cohorts,issues,propose,decide,Conflict,list_proposals
 from agent.runner import run
 from backend.reviewers import load_reviewers,reviewer_for_token
