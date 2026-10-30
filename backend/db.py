@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, Boolean, ForeignKey, JSON, text, CheckConstraint
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Float, Boolean, ForeignKey, JSON, CheckConstraint
 
 metadata = MetaData()
 clients = Table('clients', metadata, Column('id', Integer, primary_key=True), Column('external_id', String, unique=True), Column('full_name', String, nullable=False), Column('birth_date', String(10)), Column('email', String), Column('review_required', Boolean, nullable=False, default=False))

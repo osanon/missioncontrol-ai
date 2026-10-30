@@ -9,7 +9,7 @@ os.environ['REVIEW_TOKEN']='test-review-token-0000000000000000000'
 os.environ['REVIEWERS']='alice:test-alice-token-00000000000000000000,bob:test-bob-token-0000000000000000000000'
 os.environ['AGENT_MODE']='demo'
 import pytest
-from backend.db import engine,metadata
+from backend.db import engine
 from database.seed import seed
 from database.migrate import upgrade
 
