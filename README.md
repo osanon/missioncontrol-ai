@@ -20,6 +20,7 @@ This project started before the hackathon. So judges can see exactly what is new
 - Phase 2 (24 October): an independent AI reviewer agent and an approval queue that shows AI disagreements first.
 - Non-AI preparation (26 October onwards): query performance, browser sessions and a public demo mode, rate limits and an AI budget cap, a demo data reset command, review shortcuts and links, and Vultr deployment scaffolding.
 - Development tooling and AI reliability (27 October): automated GitHub checks on every pull request (linting, backend tests on SQLite and PostgreSQL, frontend build), retries and a 150-second time limit for AI provider requests, and the AI agents' instructions moved into readable files (`agent/prompts/`). Missed fixes from 26 October (a migration repair for older databases and a backend image permission fix) were also merged on 30 October.
+- Final pre-event polish (30 October – 2 November): an MIT license, repository tidy-up, and a redesigned Ask page (question box first, with the reporting period and key figures in the right-hand column).
 
 **During the event (3–8 November 2026):** listed here as it is built.
 
