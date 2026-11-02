@@ -22,3 +22,13 @@
 .settings-actions{display:flex;align-items:center;gap:16px;margin-top:8px}.demo-access{margin:22px 0 6px;padding-top:18px;border-top:1px solid #e3e9ee}.demo-access p{font-size:13px;margin:0 0 10px}.demo-access div{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .plain-summary{font-size:15px;font-weight:550;color:#1f3547;margin:0 0 6px}.shortcut-hint{font-size:11px;color:#657788;margin:-8px 0 14px}.shortcut-hint kbd{font:inherit;font-size:10px;font-weight:600;border:1px solid #cbd6df;border-bottom-width:2px;border-radius:4px;padding:0 4px;background:#fff;color:#3c5568}
 .welcome .demo-access .primary,.welcome .demo-access .secondary{width:auto;min-width:150px;padding:10px 18px}
+
+/* Ask page: question box at the top; reporting period and KPIs in the right-hand column */
+.conversation>.section-title{order:-2}
+.conversation .composer{order:-1;margin:18px 19px 6px}
+.evidence-column .period{display:grid;grid-template-columns:1fr auto 1fr;margin:0 0 16px}
+.evidence-column .period>span:first-child,.evidence-column .period button,.evidence-column .period small{grid-column:1/-1;margin:0}
+.evidence-column .period input{width:100%}
+.evidence-column .metrics{grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.evidence-column .metric strong{font-size:24px}
+@media(max-width:1000px){.evidence-column .period,.evidence-column .metrics{grid-column:1/-1}}
