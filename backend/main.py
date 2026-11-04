@@ -71,6 +71,9 @@ class MergeProposal(BaseModel):
     preview_token: str = Field(pattern=r'^[a-f0-9]{64}$')
     evidence: str = Field(min_length=10, max_length=2000)
     replaces_id: str | None = Field(default=None, max_length=100)
+class Finding(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    issue_key: str = Field(min_length=3, max_length=100)
 class Decision(BaseModel):
     model_config = ConfigDict(extra='forbid')
     decision: Literal['approve','reject','reevaluate']
@@ -152,6 +155,14 @@ def ask(body:Ask):
 def ai_review(proposal_id:str):
     from agent.reviewer import review_proposal
     return review_proposal(proposal_id)
+@app.get('/health-checks/plan',dependencies=[Depends(auth)])
+def health_check_plan(limit:int=Query(5,ge=1,le=10)):
+    from agent.investigator import plan
+    return plan(limit)
+@app.post('/health-checks/findings',dependencies=[Depends(auth),Depends(ai_limit)])
+def health_check_finding(body:Finding):
+    from agent.investigator import investigate_finding
+    return investigate_finding(body.issue_key)
 @app.get('/runs/{run_id}',dependencies=[Depends(auth)])
 def get_run(run_id:str):
     with engine.connect() as c:item=c.execute(select(runs).where(runs.c.id==run_id)).mappings().first()

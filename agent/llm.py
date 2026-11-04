@@ -201,12 +201,15 @@ def failure_message(exc, run_id):
     return 'Unexpected error during the run.'
 
 
+RUN_EVENTS = {'analyst': 'analysis_', 'reviewer': 'ai_review_', 'investigator': 'investigation_'}
+
+
 def save_run(item, actor, event_details, extra=None):
     """Store a run, its audit event and any `extra(connection)` writes in one transaction. Runs are always saved, including failures."""
     with engine.begin() as c:
         c.execute(runs.insert().values(**item))
         if extra:
             extra(c)
-        log(c, ('analysis_' if item['kind'] == 'analyst' else 'ai_review_') + item['status'],
+        log(c, RUN_EVENTS[item['kind']] + item['status'],
             {'run_id': item['id'], 'mode': item['mode'], 'model': item['model'], 'tools': [x['tool'] for x in item['trace']],
              'error': item['error'], 'input_tokens': item['input_tokens'], 'output_tokens': item['output_tokens'], **event_details}, actor)
