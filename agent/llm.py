@@ -141,12 +141,14 @@ def complete(cfg, body, deadline):
             attempt += 1
 
 
-def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6, max_steps=12, max_tokens=2200, final_prompt=None):
+def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6, max_steps=12, max_tokens=2200, final_prompt=None,
+              final_tools=None):
     """Chat-completions tool loop. Returns the final text, or None if `done()` became true or the limits were hit.
 
     With `final_prompt`, the last turn (or the turn after an empty reply) asks for a written answer and offers no tools,
     so a model that keeps calling tools or replies with nothing still writes up what it found. Leaving the tools out,
-    rather than sending tool_choice none, is what makes the Vultr-hosted models answer instead of replying blank."""
+    rather than sending tool_choice none, is what makes the Vultr-hosted models answer instead of replying blank.
+    With `final_tools`, that last turn offers only those tools instead, for an agent that finishes by calling one."""
     deadline = time.monotonic() + RUN_TIME_LIMIT
     force_final = False
     for turn in range(max_turns):
@@ -154,13 +156,15 @@ def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6
         if final:
             messages.append({'role': 'user', 'content': final_prompt})
             body = {'model': cfg.model, 'messages': messages, 'max_completion_tokens': max_tokens}
+            if final_tools:
+                body.update(tools=final_tools, parallel_tool_calls=False)
         else:
             body = {'model': cfg.model, 'messages': messages, 'tools': tools, 'parallel_tool_calls': False, 'max_completion_tokens': max_tokens}
         data = complete(cfg, body, deadline)
         usage.add(data)
         msg, calls = parse_message(data)
         text = (msg.get('content') or '').strip()
-        if final:
+        if final and not (final_tools and calls):
             return text or None
         if not calls:
             if text or not final_prompt:
@@ -184,7 +188,7 @@ def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6
                 output = json.dumps({'notice': 'Tool output exceeded the context limit. Use a narrower SQL query. Full evidence is in the run trace.',
                                      'preview': output[:36000]})
             messages.append({'role': 'tool', 'tool_call_id': tc['id'], 'content': output})
-        if done():
+        if done() or final:
             return None
     return None
 

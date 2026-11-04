@@ -206,3 +206,16 @@ def test_analyst_live_run_records_tokens(monkeypatch):
     with TestClient(app) as client:
         result = client.post('/ask', headers=HEADERS, json={'question': 'Say hello.'}).json()
     assert (result['input_tokens'], result['output_tokens'], result['kind']) == (30, 5, 'analyst')
+
+
+def test_live_review_is_asked_to_submit_when_it_keeps_checking(monkeypatch, enrollment):
+    p = exit_proposal(enrollment, '2026-02-01')
+    check = tool_call('query_sql', {'sql': 'SELECT MAX(service_date) AS latest FROM services WHERE client_id = 1'})
+    provider = Provider(monkeypatch, *[check] * 5, submit(verdict='uncertain', confidence='medium'))
+    with TestClient(app) as client:
+        review = client.post(f"/proposals/{p['id']}/ai-review", headers=HEADERS).json()
+    assert review['verdict'] == 'uncertain'
+    last = provider.requests[-1]
+    assert [t['function']['name'] for t in last['tools']] == ['submit_review']
+    assert any(m['role'] == 'user' and str(m['content']).startswith('Stop checking now.') for m in last['messages'])
+    assert all(len(r['tools']) == 3 for r in provider.requests[:-1])
