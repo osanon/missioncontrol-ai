@@ -77,13 +77,15 @@ def demo_answer(question,start,end,call):
     else:answer='Demo mode supports performance summaries, period comparisons, employment/housing cohort comparisons, and data quality scans. Choose an example prompt, or configure live AI for open-ended investigation.'
     return answer
 
+FINAL_PROMPT='Stop investigating now. Using only the tool evidence above, write your final answer for the user, with citations, denominators and any limits.'
+
 def live_answer(question,start,end,previous,call,cfg,usage):
     system=load_prompt('analyst',start=start,end=end)
     messages=[{'role':'system','content':system}]
     if previous:
         messages += [{'role':'user','content':previous['question']},{'role':'assistant','content':previous['answer']}]
     messages.append({'role':'user','content':question})
-    answer=tool_loop(cfg,messages,TOOLS,call,usage)
+    answer=tool_loop(cfg,messages,TOOLS,call,usage,final_prompt=FINAL_PROMPT)
     if answer is None:return 'Investigation reached its tool limit. Review the evidence below and narrow the question.'
     return answer or 'The model returned no answer.'
 

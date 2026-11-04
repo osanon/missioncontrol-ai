@@ -141,16 +141,32 @@ def complete(cfg, body, deadline):
             attempt += 1
 
 
-def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6, max_steps=12, max_tokens=2200):
-    """Chat-completions tool loop. Returns the final text, or None if `done()` became true or the limits were hit."""
+def tool_loop(cfg, messages, tools, call, usage, done=lambda: False, max_turns=6, max_steps=12, max_tokens=2200, final_prompt=None):
+    """Chat-completions tool loop. Returns the final text, or None if `done()` became true or the limits were hit.
+
+    With `final_prompt`, the last turn (or the turn after an empty reply) asks for a written answer and offers no tools,
+    so a model that keeps calling tools or replies with nothing still writes up what it found. Leaving the tools out,
+    rather than sending tool_choice none, is what makes the Vultr-hosted models answer instead of replying blank."""
     deadline = time.monotonic() + RUN_TIME_LIMIT
-    for _ in range(max_turns):
-        data = complete(cfg, {'model': cfg.model, 'messages': messages, 'tools': tools, 'parallel_tool_calls': False,
-                              'max_completion_tokens': max_tokens}, deadline)
+    force_final = False
+    for turn in range(max_turns):
+        final = bool(final_prompt) and (force_final or turn == max_turns - 1)
+        if final:
+            messages.append({'role': 'user', 'content': final_prompt})
+            body = {'model': cfg.model, 'messages': messages, 'max_completion_tokens': max_tokens}
+        else:
+            body = {'model': cfg.model, 'messages': messages, 'tools': tools, 'parallel_tool_calls': False, 'max_completion_tokens': max_tokens}
+        data = complete(cfg, body, deadline)
         usage.add(data)
         msg, calls = parse_message(data)
+        text = (msg.get('content') or '').strip()
+        if final:
+            return text or None
         if not calls:
-            return msg.get('content') or ''
+            if text or not final_prompt:
+                return text
+            force_final = True
+            continue
         messages.append({'role': 'assistant', 'content': msg.get('content'), 'tool_calls': calls})
         for tc in calls:
             if len(call.trace) >= max_steps:
