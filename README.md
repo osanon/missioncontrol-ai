@@ -24,6 +24,9 @@ This project started before the hackathon. So judges can see exactly what is new
 
 **During the event (3–8 November 2026):** listed here as it is built.
 
+- 3 November: deployed MissionControl on a Vultr Cloud Compute instance (Chicago) with public HTTPS, and switched on live AI through Vultr Serverless Inference: `deepseek-v4.1-flash-1017` for the analyst and `glm-5.3` for the independent reviewer, so the second opinion comes from a different model family.
+- 4 November: fixes found while testing on Vultr. The analyst is now asked for a written answer, without tools, when it runs out of turns or replies blank (#8), and the reviewer is asked to submit its review on its last turn (#9).
+
 ## Once the source is in your Codespace
 
 After `Codespaces: Rebuild Container` completes, run this in the Codespaces terminal:
