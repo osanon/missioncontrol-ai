@@ -32,3 +32,24 @@
 .evidence-column .metrics{grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
 .evidence-column .metric strong{font-size:24px}
 @media(max-width:1000px){.evidence-column .period,.evidence-column .metrics{grid-column:1/-1}}
+/* AI health check panel on Data Health */
+.health-check{padding:22px 24px;margin:22px 0 4px}
+.health-check-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.health-check-head h2{display:flex;align-items:center;gap:9px;margin:0 0 6px;font-size:18px}
+.health-check-head h2 svg{color:#76985d}
+.health-check-head p{margin:0;max-width:760px;color:#526875;line-height:1.55}
+.health-check-head button{flex-shrink:0}
+.health-check-mode{display:block;margin-top:10px;color:#7b8b98;font-size:12px}
+.health-check-list{list-style:none;margin:16px 0 0;padding:0;border-top:1px solid #edf0f3}
+.health-check-list li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #edf0f3}
+.health-check-icon{display:flex;color:#98a3ab}
+.health-check-list li.done .health-check-icon{color:#52862c}
+.health-check-list li.failed .health-check-icon{color:#b5523b}
+.health-check-list li.working .health-check-icon{color:#3aa790}
+.health-check-finding{display:flex;flex-direction:column;gap:2px;min-width:0}
+.health-check-finding small{color:#7b8b98}
+.health-check-error{margin:4px 0 0;color:#a1452f;font-size:12px}
+.health-check-result{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;font-size:13px}
+.health-check-result .text-button{padding:0}
+.health-check-summary{margin:14px 0 0;color:#395266}
+@media(max-width:700px){.health-check{padding:18px}.health-check-head{flex-direction:column}.health-check-list li{grid-template-columns:24px minmax(0,1fr)}.health-check-result{grid-column:2;justify-content:flex-start}}
