@@ -201,7 +201,7 @@ def failure_message(exc, run_id):
     return 'Unexpected error during the run.'
 
 
-RUN_EVENTS = {'analyst': 'analysis_', 'reviewer': 'ai_review_', 'investigator': 'investigation_'}
+RUN_EVENTS = {'analyst': 'analysis_', 'reviewer': 'ai_review_', 'investigator': 'investigation_', 'reporter': 'funder_report_'}
 
 
 def save_run(item, actor, event_details, extra=None):

@@ -74,6 +74,10 @@ class MergeProposal(BaseModel):
 class Finding(BaseModel):
     model_config = ConfigDict(extra='forbid')
     issue_key: str = Field(min_length=3, max_length=100)
+class ReportPeriod(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    start: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    end: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
 class Decision(BaseModel):
     model_config = ConfigDict(extra='forbid')
     decision: Literal['approve','reject','reevaluate']
@@ -167,6 +171,10 @@ def health_check_finding(body:Finding):
 def get_ai_trust():
     from backend.trust import ai_trust
     return ai_trust()
+@app.post('/funder-report',dependencies=[Depends(auth),Depends(ai_limit)])
+def funder_report(body:ReportPeriod):
+    from agent.funder_report import draft_report
+    return draft_report(body.start,body.end)
 @app.get('/runs/{run_id}',dependencies=[Depends(auth)])
 def get_run(run_id:str):
     with engine.connect() as c:item=c.execute(select(runs).where(runs.c.id==run_id)).mappings().first()
