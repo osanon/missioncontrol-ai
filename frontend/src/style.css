@@ -96,3 +96,18 @@
 .md-table table{border-collapse:collapse;min-width:60%;font-size:13px;line-height:1.5}
 .md-table th,.md-table td{border:1px solid #e0e6eb;padding:7px 12px;text-align:left}
 .md-table th{background:#f6f8f9;font-weight:600;color:#395266}
+/* Funder report on Program Performance */
+.funder-report{padding:22px 24px;margin:0 0 22px}
+.funder-report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.funder-report-head h2{display:flex;align-items:center;gap:9px;margin:0 0 6px;font-size:18px}
+.funder-report-head h2 svg{color:#76985d}
+.funder-report-head p{margin:0;max-width:760px;color:#526875;line-height:1.55}
+.funder-report-head button{flex-shrink:0}
+.funder-report-mode{display:block;margin-top:10px;color:#7b8b98;font-size:12px}
+.funder-report-error{color:#a1452f;margin:12px 0 0}
+.funder-report-check{display:flex;align-items:center;gap:10px;margin:16px 0;padding:12px 14px;border-radius:8px;font-size:13px}
+.funder-report-check span{flex:1}
+.funder-report-check.ok{background:#eef6e4;color:#3f6a27}
+.funder-report-check.warn{background:#fdf1e3;color:#8a4b12}
+.funder-report-preview{border:1px solid #e0e6eb;border-radius:8px;padding:18px 22px;max-height:640px;overflow:auto;background:#fcfdfd}
+@media(max-width:700px){.funder-report{padding:18px}.funder-report-head{flex-direction:column}.funder-report-check{flex-wrap:wrap}}
