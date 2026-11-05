@@ -29,12 +29,16 @@ def check(client, key=KEY):
     return client.post('/health-checks/findings', headers=HEADERS, json={'issue_key': key})
 
 
-def test_plan_lists_open_findings_most_severe_first(wage):
+def test_plan_mixes_kinds_most_severe_first_in_record_order(wage):
     with TestClient(app) as client:
         found = client.get('/health-checks/plan?limit=10', headers=HEADERS).json()
     assert 0 < len(found) <= 10 and {'key', 'kind', 'title', 'severity'} <= set(found[0])
-    order = {'high': 0, 'medium': 1}
-    assert [order[f['severity']] for f in found] == sorted(order[f['severity']] for f in found)
+    kinds = list(dict.fromkeys(f['kind'] for f in found))
+    assert len(kinds) > 1 and found[0]['severity'] == 'high'
+    assert [f['kind'] for f in found[:len(kinds)]] == kinds  # one of each kind before any repeats
+    for kind in kinds:
+        ids = [f['record_id'] for f in found if f['kind'] == kind]
+        assert ids == sorted(ids)
 
 
 def test_demo_health_check_proposes_safe_fix_and_reviews_it(wage):
