@@ -19,7 +19,8 @@ def validate_sql(sql):
     ctes={n.alias_or_name for n in tree.find_all(exp.CTE)}
     if ctes.intersection(DATA_TABLES):raise ValueError('CTEs cannot shadow source tables.')
     for node in tree.walk():
-        if isinstance(node,exp.Func):
+        # Newer sqlglot treats AND, OR and EXISTS as functions; allowlisted constructs stay allowed
+        if isinstance(node,exp.Func) and type(node).__name__ not in NODES:
             name=node.sql_name() if not isinstance(node,exp.Anonymous) else node.name.upper()
             if name not in FUNCTIONS:raise ValueError(f'Function {name} is not allowed.')
         elif type(node).__name__ not in NODES:

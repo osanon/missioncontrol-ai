@@ -26,10 +26,20 @@ def test_seed_and_known_anomalies():
  "SELECT pg_read_file('/etc/passwd')",'SELECT * FROM generate_series(1,10000000)',
  "COPY clients TO '/tmp/leak'",'SELECT 1; SELECT 2',
  "SELECT set_config('statement_timeout','0',false)",
- 'WITH clients AS (SELECT 1) SELECT * FROM clients'
+ 'WITH clients AS (SELECT 1) SELECT * FROM clients',
+ 'SELECT id FROM clients WHERE id = 1 AND pg_sleep(1) IS NULL'
 ])
 def test_unsafe_sql_rejected(sql):
     with pytest.raises(ValueError):validate_sql(sql)
+
+@pytest.mark.parametrize('sql',[
+ 'SELECT id FROM clients WHERE id < 5 AND review_required = false',
+ 'SELECT id FROM clients WHERE id = 1 OR id = 2',
+ 'SELECT c.id FROM clients c JOIN enrollments e ON e.client_id = c.id AND e.program_id = 1',
+ 'SELECT c.id FROM clients c WHERE EXISTS (SELECT 1 FROM enrollments e WHERE e.client_id = c.id)'
+])
+def test_conditions_with_and_or_exists_allowed(sql):
+    assert safe_query(sql)['rows']
 
 def test_safe_select_and_row_cap():
     out=safe_query('SELECT id FROM clients ORDER BY id')
