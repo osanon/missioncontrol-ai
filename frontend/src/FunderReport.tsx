@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CircleAlert, Download, FileText, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { Markdown } from './Markdown';
 
-type Report = {run_id:string;mode:string;start:string;end:string;markdown:string;check:{unverified_numbers:string[]}};
+type Report = {run_id:string;mode:string;start:string;end:string;markdown:string;check:{unverified_numbers:string[];missing_sections:string[]}};
 type Api = <T>(path:string,init?:RequestInit)=>Promise<T>;
 
 // Drafts a funder report for the selected period: verified figures, data-quality notes and a narrative whose numbers are checked.
@@ -18,7 +18,7 @@ export function FunderReport({api,start,end,live}:{api:Api;start:string;end:stri
   const url=URL.createObjectURL(new Blob([r.markdown],{type:'text/markdown'})),a=document.createElement('a');
   a.href=url;a.download=`funder-report-${r.start}-to-${r.end}.md`;a.click();URL.revokeObjectURL(url);
  }
- const flagged=report?.check.unverified_numbers??[];
+ const flagged=report?.check.unverified_numbers??[],missing=report?.check.missing_sections??[];
  return <section className="card funder-report">
   <div className="funder-report-head">
    <div><h2><FileText size={18}/>Funder report</h2><p>Draft a short update for funders for {start} to {end}. The figures come from the verified metrics, every number in the text is checked against them, and a person reviews the draft before sending.</p></div>
@@ -27,9 +27,9 @@ export function FunderReport({api,start,end,live}:{api:Api;start:string;end:stri
   <small className="funder-report-mode">{live?'Live AI writes the narrative and uses AI tokens.':'Guided demo: a template writes the narrative, no AI cost.'}</small>
   {error&&<p className="funder-report-error">{error}</p>}
   {report&&<>
-   <div className={'funder-report-check '+(flagged.length?'warn':'ok')}>{flagged.length
-    ?<><CircleAlert size={16}/><span><b>Check before sending:</b> these numbers are not verified figures: {flagged.join(', ')}.</span></>
-    :<><ShieldCheck size={16}/><span><b>Number check passed:</b> every number in the text matches the verified figures.</span></>}
+   <div className={'funder-report-check '+(flagged.length||missing.length?'warn':'ok')}>{flagged.length||missing.length
+    ?<><CircleAlert size={16}/><span><b>Check before sending:</b>{flagged.length>0&&` these numbers are not verified figures: ${flagged.join(', ')}.`}{missing.length>0&&` These sections are missing: ${missing.join(', ')}.`}</span></>
+    :<><ShieldCheck size={16}/><span><b>Check passed:</b> every number in the text matches the verified figures, and every section is present.</span></>}
     <button className="secondary" onClick={()=>download(report)}><Download size={14}/>Download (.md)</button></div>
    <div className="answer funder-report-preview"><Markdown text={report.markdown}/></div>
   </>}

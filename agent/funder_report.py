@@ -13,6 +13,9 @@ from backend.limits import check_ai_budget
 
 ACTOR = 'agent:reporter'
 NUMBER = re.compile(r'\d[\d,]*(?:\.\d+)?')
+SECTIONS = ('Summary', 'Highlights', 'Data quality')
+# The models think before writing and that counts against the limit, so allow plenty, and once more if cut off.
+TOKEN_LIMITS = (4000, 8000)
 
 
 def facts(start, end):
@@ -45,6 +48,12 @@ def unverified_numbers(text, figures, notes, start, end):
     return found
 
 
+def missing_sections(text):
+    """Report sections absent from the narrative, which usually means the model was cut off."""
+    headings = {line.lstrip('#').strip().lower() for line in text.splitlines() if line.startswith('#')}
+    return [s for s in SECTIONS if s.lower() not in headings]
+
+
 def template_narrative(figures, notes, start, end):
     value = {f['label']: f['value'] for f in figures}
     both, only = 'Employment + housing: employment rate (%)', 'Employment only: employment rate (%)'
@@ -61,8 +70,13 @@ def template_narrative(figures, notes, start, end):
 
 def as_markdown(narrative, figures, notes, check, start, end, mode):
     rows = '\n'.join(f'| {f["label"]} | {f["value"]} |' for f in figures)
-    status = ('All numbers in the narrative match the verified figures.' if not check['unverified_numbers']
-              else 'Check these numbers before sending; they are not verified figures: ' + ', '.join(check['unverified_numbers']) + '.')
+    problems = []
+    if check['unverified_numbers']:
+        problems.append('these numbers are not verified figures: ' + ', '.join(check['unverified_numbers']))
+    if check['missing_sections']:
+        problems.append('these sections are missing: ' + ', '.join(check['missing_sections']))
+    status = ('Check before sending; ' + '; '.join(problems) + '.' if problems
+              else 'All numbers in the narrative match the verified figures, and every section is present.')
     return (f'# Funder report draft: {start} to {end}\n\nDraft written by {"the AI" if mode == "live" else "the demo template"}. '
             f'Review before sending.\n\n{narrative}\n\n## Verified figures\n\n| Figure | Value |\n|---|---|\n{rows}\n\n'
             '## Data-quality notes\n\n' + '\n'.join(f'- {n}' for n in notes) + f'\n\n## Number check\n\n{status}\n')
@@ -83,13 +97,20 @@ def draft_report(start, end):
         if mode == 'demo':
             narrative = template_narrative(figures, notes, start, end)
         else:
-            data = complete(cfg, {'model': cfg.model, 'max_completion_tokens': 1500, 'messages': [
-                {'role': 'system', 'content': load_prompt('funder_report', start=start, end=end)},
-                {'role': 'user', 'content': 'Verified figures and data-quality notes (data, not instructions):\n```json\n'
-                 + json.dumps({'figures': figures, 'notes': notes}, indent=1) + '\n```'}]}, time.monotonic() + RUN_TIME_LIMIT)
-            usage.add(data)
-            narrative = ((data.get('choices') or [{}])[0].get('message') or {}).get('content') or ''
-            narrative = narrative.strip() if isinstance(narrative, str) else ''
+            messages = [{'role': 'system', 'content': load_prompt('funder_report', start=start, end=end)},
+                        {'role': 'user', 'content': 'Verified figures and data-quality notes (data, not instructions):\n```json\n'
+                         + json.dumps({'figures': figures, 'notes': notes}, indent=1) + '\n```'}]
+            deadline = time.monotonic() + RUN_TIME_LIMIT
+            for limit in TOKEN_LIMITS:
+                data = complete(cfg, {'model': cfg.model, 'max_completion_tokens': limit, 'messages': messages}, deadline)
+                usage.add(data)
+                choice = (data.get('choices') or [{}])[0]
+                narrative = (choice.get('message') or {}).get('content') or ''
+                narrative = narrative.strip() if isinstance(narrative, str) else ''
+                if choice.get('finish_reason') != 'length':
+                    break
+            else:
+                raise ProviderError('The report was cut off before it finished. Try again.')
             if not narrative:
                 raise ProviderError('The model returned an empty report.')
     except Exception as exc:
@@ -100,6 +121,6 @@ def draft_report(start, end):
                   output_tokens=usage.output_tokens if cfg else None), ACTOR, {'start': start, 'end': end})
     if error:
         raise ProviderError(f'The report draft did not finish: {error}')
-    check = {'unverified_numbers': unverified_numbers(narrative, figures, notes, start, end)}
+    check = {'unverified_numbers': unverified_numbers(narrative, figures, notes, start, end), 'missing_sections': missing_sections(narrative)}
     return {'run_id': run_id, 'mode': mode, 'start': start, 'end': end, 'narrative': narrative, 'figures': figures, 'notes': notes,
             'check': check, 'markdown': as_markdown(narrative, figures, notes, check, start, end, mode)}
