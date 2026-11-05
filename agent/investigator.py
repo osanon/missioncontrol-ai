@@ -34,10 +34,18 @@ SEVERITY = {'high': 0, 'medium': 1}
 
 
 def plan(limit=5):
-    """Findings a health check would work on: no proposal yet and not already flagged, most severe first."""
-    open_findings = [f for f in issues() if f['proposal_status'] is None and not f['review_required']]
-    open_findings.sort(key=lambda f: (SEVERITY.get(f['severity'], 2), f['key']))
-    return [{key: f[key] for key in ('key', 'kind', 'title', 'severity', 'table', 'record_id')} for f in open_findings[:limit]]
+    """Findings a health check would work on: no proposal yet and not already flagged.
+
+    One finding of each kind in turn (most severe kinds first, lowest record number first), so a short check
+    covers several kinds of problem instead of five of the same one."""
+    by_kind = {}
+    for f in sorted(issues(), key=lambda f: (SEVERITY.get(f['severity'], 2), f['kind'], f['record_id'])):
+        if f['proposal_status'] is None and not f['review_required']:
+            by_kind.setdefault(f['kind'], []).append(f)
+    picked = []
+    while len(picked) < limit and any(by_kind.values()):
+        picked += [group.pop(0) for group in by_kind.values() if group][:limit - len(picked)]
+    return [{key: f[key] for key in ('key', 'kind', 'title', 'severity', 'table', 'record_id')} for f in picked]
 
 
 def default_resolution(issue):
