@@ -53,3 +53,17 @@
 .health-check-result .text-button{padding:0}
 .health-check-summary{margin:14px 0 0;color:#395266}
 @media(max-width:700px){.health-check{padding:18px}.health-check-head{flex-direction:column}.health-check-list li{grid-template-columns:24px minmax(0,1fr)}.health-check-result{grid-column:2;justify-content:flex-start}}
+/* AI reviewer track record on Approvals & Audit */
+.trust{padding:22px 24px;margin:22px 0 18px}
+.trust-head h2{display:flex;align-items:center;gap:9px;margin:0 0 6px;font-size:18px}
+.trust-head h2 svg{color:#76985d}
+.trust-head p{margin:0;max-width:760px;color:#526875;line-height:1.55}
+.trust-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.trust-stats div{background:#f6f8f9;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.trust-stats strong{font-size:26px;font-weight:600;color:#213449}
+.trust-stats span{font-size:12px;color:#657788}
+.trust-table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:13px}
+.trust-table th,.trust-table td{text-align:left;padding:8px 10px;border-bottom:1px solid #edf0f3}
+.trust-table th{color:#657788;font-weight:500}
+.trust-table td:not(:first-child),.trust-table th:not(:first-child){text-align:right}
+@media(max-width:700px){.trust{padding:18px}.trust-stats{grid-template-columns:repeat(2,1fr)}}

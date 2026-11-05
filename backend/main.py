@@ -163,6 +163,10 @@ def health_check_plan(limit:int=Query(5,ge=1,le=10)):
 def health_check_finding(body:Finding):
     from agent.investigator import investigate_finding
     return investigate_finding(body.issue_key)
+@app.get('/ai-trust',dependencies=[Depends(auth)])
+def get_ai_trust():
+    from backend.trust import ai_trust
+    return ai_trust()
 @app.get('/runs/{run_id}',dependencies=[Depends(auth)])
 def get_run(run_id:str):
     with engine.connect() as c:item=c.execute(select(runs).where(runs.c.id==run_id)).mappings().first()
