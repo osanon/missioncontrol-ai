@@ -67,3 +67,19 @@
 .trust-table th{color:#657788;font-weight:500}
 .trust-table td:not(:first-child),.trust-table th:not(:first-child){text-align:right}
 @media(max-width:700px){.trust{padding:18px}.trust-stats{grid-template-columns:repeat(2,1fr)}}
+/* Approvals: the AI reviewer track record as a narrow column on the right */
+.approvals-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:22px;align-items:start}
+.approvals-main{min-width:0}
+.approvals-layout .trust{margin:0;padding:18px;position:sticky;top:20px}
+.approvals-layout .trust-head h2{font-size:15px}
+.approvals-layout .trust-head p{font-size:12px}
+.approvals-layout .trust-stats{grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.approvals-layout .trust-stats div{padding:10px 12px}
+.approvals-layout .trust-stats div:first-child{grid-column:1/-1}
+.approvals-layout .trust-stats strong{font-size:20px}
+.approvals-layout .trust-stats div:first-child strong{font-size:30px}
+.approvals-layout .trust-stats span{font-size:11px}
+.approvals-layout .trust-table{font-size:11px}
+.approvals-layout .trust-table th,.approvals-layout .trust-table td{padding:6px 4px}
+.approvals-layout .trust small{font-size:11px;line-height:1.5}
+@media(max-width:1100px){.approvals-layout{grid-template-columns:1fr}.approvals-layout .trust{position:static}}
