@@ -26,6 +26,7 @@ This project started before the hackathon. So judges can see exactly what is new
 
 - 3 November: deployed MissionControl on a Vultr Cloud Compute instance (Chicago) with public HTTPS, and switched on live AI through Vultr Serverless Inference: `deepseek-v4.1-flash-1017` for the analyst and `glm-5.3` for the independent reviewer, so the second opinion comes from a different model family.
 - 4 November: fixes found while testing on Vultr. The analyst is now asked for a written answer, without tools, when it runs out of turns or replies blank (#8), and the reviewer is asked to submit its review on its last turn (#9).
+- 5 November: one-click AI health check on Data Health. An AI investigator (`agent/investigator.py`) takes one open finding at a time, one of each kind first, checks the records and proposes the safest fix: a follow-up flag unless the database confirms the exact value. The independent AI reviewer then checks each proposal, and the page shows live progress, the proposed fix and the reviewer's verdict. Nothing changes until a person approves it (#11, #12, #13).
 
 ## Once the source is in your Codespace
 
