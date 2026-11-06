@@ -111,3 +111,7 @@
 .funder-report-check.warn{background:#fdf1e3;color:#8a4b12}
 .funder-report-preview{border:1px solid #e0e6eb;border-radius:8px;padding:18px 22px;max-height:640px;overflow:auto;background:#fcfdfd}
 @media(max-width:700px){.funder-report{padding:18px}.funder-report-head{flex-direction:column}.funder-report-check{flex-wrap:wrap}}
+.welcome .demo-access{border-top:0;margin:26px 0 8px;padding-top:0}
+.token-access{margin:22px auto 0;padding-top:16px;border-top:1px solid #e3e9ee}
+.token-access summary{cursor:pointer;font-size:13px;color:#526879}
+.token-access form{margin:18px auto 6px}

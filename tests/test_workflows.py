@@ -41,6 +41,15 @@ def test_unsafe_sql_rejected(sql):
 def test_conditions_with_and_or_exists_allowed(sql):
     assert safe_query(sql)['rows']
 
+@pytest.mark.parametrize('sql',[
+ "SELECT to_char(exit_date,'YYYY-MM') AS month, count(*) FROM enrollments GROUP BY 1",
+ "SELECT date_trunc('month',exit_date) AS month, count(*) FROM enrollments GROUP BY 1",
+ 'SELECT extract(year FROM exit_date) AS year FROM enrollments',
+ "SELECT count(*) FROM enrollments WHERE exit_date >= DATE '2026-07-01' - INTERVAL '90 days'"
+])
+def test_date_functions_allowed(sql):
+    assert validate_sql(sql)
+
 def test_safe_select_and_row_cap():
     out=safe_query('SELECT id FROM clients ORDER BY id')
     assert len(out['rows'])==200 and out['truncated']
