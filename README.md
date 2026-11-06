@@ -3,7 +3,7 @@
 **AI agents that find, fix and double-check a nonprofit's data problems, with a person always making the final call.** Built for the Vultr Agent Rush hackathon (Challenge 2: Powering the Future of Work) and running entirely on Vultr.
 
 **Live demo:** https://64-177-121-249.sslip.io (choose **Try as analyst** or **Try as reviewer**, no sign-up needed)
-**Demo video:** link added at submission
+**Demo video:** https://youtu.be/0J5Mso3DDek
 
 All data in the demo is fictional: 2,000 made-up clients across six programs. The demo is shared and is reset before judging.
 
@@ -81,7 +81,8 @@ This project started before the hackathon. So judges can see exactly what is new
 - 5 November: one-click AI health check on Data Health. An AI investigator (`agent/investigator.py`) takes one open finding at a time, one of each kind first, checks the records and proposes the safest fix: a follow-up flag unless the database confirms the exact value. The independent AI reviewer then checks each proposal, and the page shows live progress, the proposed fix and the reviewer's verdict. Nothing changes until a person approves it (#11, #12, #13).
 - 5 November (continued): AI reviewer track record on Approvals & Audit, showing how often people follow or overrule the independent AI reviewer, from the verdict recorded with each decision (#15, shown in a side column since #17). Also fixed the SQL safety check, which had been rejecting AND, OR and EXISTS and so limiting what the AI agents could check (#16).
 - 5 November (later): AI answers are now formatted with headings, lists and tables, without ever rendering raw HTML from the model (#19). New funder report on Program Performance: verified figures from the app's own metrics, data-quality notes from Data Health, and a narrative written by the AI, with every number checked against the verified figures and every section required before the draft gets a green check; a person reviews it before sending (#20, #21, #22).
-- 5 November(evening): this README, rewritten for judges.
+- 5 November (evening): this README, rewritten for judges.
+- 6 November: the welcome page now leads with demo access, with token sign-in folded away. The SQL safety check now allows date functions (`to_char`, `date_trunc`, `EXTRACT`, `INTERVAL`), which had been blocking the quarterly briefing, and analyst answers have more room so they no longer stop mid-sentence (#25). Recorded the demo video.
 
 ## Run it yourself
 
