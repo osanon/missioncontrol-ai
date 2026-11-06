@@ -85,7 +85,7 @@ def live_answer(question,start,end,previous,call,cfg,usage):
     if previous:
         messages += [{'role':'user','content':previous['question']},{'role':'assistant','content':previous['answer']}]
     messages.append({'role':'user','content':question})
-    answer=tool_loop(cfg,messages,TOOLS,call,usage,final_prompt=FINAL_PROMPT)
+    answer=tool_loop(cfg,messages,TOOLS,call,usage,max_tokens=4000,final_prompt=FINAL_PROMPT)
     if answer is None:return 'Investigation reached its tool limit. Review the evidence below and narrow the question.'
     return answer or 'The model returned no answer.'
 

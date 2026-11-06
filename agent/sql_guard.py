@@ -6,8 +6,8 @@ from sqlglot import exp
 from sqlalchemy import text
 from backend.db import reader, DATA_TABLES
 
-FUNCTIONS={'COUNT','SUM','AVG','MIN','MAX','ROUND','COALESCE','NULLIF','LOWER','UPPER','ABS','CAST','EXTRACT','CASE','IF'}
-NODES={'Select','From','Table','Identifier','Column','Star','Alias','TableAlias','Join','Where','Group','Having','Order','Ordered','Limit','Offset','Literal','Null','Boolean','Distinct','Paren','Subquery','With','CTE','Union','Intersect','Except','EQ','NEQ','GT','GTE','LT','LTE','And','Or','Not','Is','In','Between','Like','ILike','Add','Sub','Mul','Div','Mod','Neg','DataType','DataTypeParam','When','Exists'}
+FUNCTIONS={'COUNT','SUM','AVG','MIN','MAX','ROUND','COALESCE','NULLIF','LOWER','UPPER','ABS','CAST','EXTRACT','CASE','IF','TIME_TO_STR','TIMESTAMP_TRUNC','DATE_TRUNC'}
+NODES={'Select','From','Table','Identifier','Column','Star','Alias','TableAlias','Join','Where','Group','Having','Order','Ordered','Limit','Offset','Literal','Null','Boolean','Distinct','Paren','Subquery','With','CTE','Union','Intersect','Except','EQ','NEQ','GT','GTE','LT','LTE','And','Or','Not','Is','In','Between','Like','ILike','Add','Sub','Mul','Div','Mod','Neg','DataType','DataTypeParam','When','Exists','Var','Interval'}
 
 def validate_sql(sql):
     if len(sql)>12000:raise ValueError('SQL exceeds the size limit.')
