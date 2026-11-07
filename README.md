@@ -3,7 +3,7 @@
 **AI agents that find, fix and double-check a nonprofit's data problems, with a person always making the final call.** Built for the Vultr Agent Rush hackathon (Challenge 2: Powering the Future of Work) and running entirely on Vultr.
 
 **Live demo:** https://64-177-121-249.sslip.io (choose **Try as analyst** or **Try as reviewer**, no sign-up needed)
-**Demo video:** https://youtu.be/0J5Mso3DDek
+**Demo video:** https://youtu.be/3HlMg7Je7DQ
 
 All data in the demo is fictional: 2,000 made-up clients across six programs. The demo is shared and is reset before judging.
 
